@@ -28,12 +28,12 @@ export default function Home() {
         {/* Left side - text */}
         <div className="mb-12 max-w-xl text-center lg:mb-0 lg:text-left">
           <h1 className="mb-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-            Find pickup basketball.{" "}
-            <span className="text-teal">Know who&apos;s there.</span>
+            Improve your pickup{" "}
+            <span className="text-teal">basketball experience.</span>
           </h1>
           <p className="mb-8 text-lg text-text-secondary sm:text-xl">
-            Discover courts near you, see real-time check-ins, and rate the
-            players you hoop with. No more showing up to an empty court.
+            Never be surprised again. We give you all the info you need to have
+            a great run. No more guessing, just show up and play.
           </p>
           <div className="flex flex-col items-center gap-4 sm:flex-row lg:justify-start">
             <Link
@@ -62,8 +62,8 @@ export default function Home() {
           </div>
           <div className="w-44 translate-y-8 rotate-3 overflow-hidden rounded-3xl shadow-2xl sm:w-52">
             <img
-              src="/screenshot-courts.jpg"
-              alt="G.O.A.T.S courts list"
+              src="/screenshot-courts-active.jpg"
+              alt="G.O.A.T.S courts list showing active players"
               className="w-full"
             />
           </div>
@@ -73,51 +73,30 @@ export default function Home() {
       {/* Features */}
       <section className="bg-surface px-6 py-20 sm:px-12">
         <h2 className="mb-16 text-center text-3xl font-bold sm:text-4xl">
-          Everything you need to <span className="text-teal">hoop</span>
+          Everything you need to play... <span className="text-teal">Right now</span>
         </h2>
         <div className="mx-auto grid max-w-5xl gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <FeatureCard
             icon="/screenshot-courts.jpg"
             title="Find Courts"
-            description="Browse basketball courts with details on baskets, surface, lights, and 3-point lines."
+            description="Browse basketball courts with our custom reviews, the details that matter, and commentary straight from the court."
           />
           <FeatureCard
-            icon="/screenshot-welcome.jpg"
+            icon="/screenshot-court-detail.jpg"
             title="Live Check-ins"
             description="See how many people are at each court right now. No more showing up to an empty gym."
+            imagePosition="center 100%"
           />
           <FeatureCard
-            icon="/screenshot-ratings.jpg"
+            icon="/screenshot-rate-player.jpg"
             title="Rate Players"
-            description="Play together for 30+ seconds and unlock the ability to rate each other."
+            description="Play with other players and unlock the ability to rate each other&apos;s skills."
           />
           <FeatureCard
             icon="/screenshot-profile.jpg"
             title="Build Your Rep"
-            description="Your overall rating follows you. Show up, play hard, earn your status."
+            description="Your overall rating follows you. Show up, play hard, become a G.O.A.T."
           />
-        </div>
-      </section>
-
-      {/* Screenshots strip */}
-      <section className="px-6 py-20 sm:px-12">
-        <h2 className="mb-12 text-center text-3xl font-bold sm:text-4xl">
-          See it in action
-        </h2>
-        <div className="mx-auto flex max-w-4xl justify-center gap-4 overflow-hidden sm:gap-6">
-          {[
-            { src: "/screenshot-welcome.jpg", alt: "Welcome" },
-            { src: "/screenshot-courts.jpg", alt: "Courts" },
-            { src: "/screenshot-ratings.jpg", alt: "Ratings" },
-            { src: "/screenshot-profile.jpg", alt: "Profile" },
-          ].map((s) => (
-            <div
-              key={s.alt}
-              className="w-40 flex-shrink-0 overflow-hidden rounded-2xl shadow-lg sm:w-48"
-            >
-              <img src={s.src} alt={s.alt} className="w-full" />
-            </div>
-          ))}
         </div>
       </section>
 
@@ -129,10 +108,10 @@ export default function Home() {
           className="mx-auto mb-6 h-20 w-20 rounded-2xl"
         />
         <h2 className="mb-4 text-3xl font-bold text-text-on-dark sm:text-4xl">
-          Ready to find your game?
+          Ready to improve your game?
         </h2>
         <p className="mx-auto mb-8 max-w-md text-text-on-dark/70">
-          Download G.O.A.T.S and never show up to an empty court again.
+          Download G.O.A.T.S. It&apos;s not a baaahhh&apos;d decision... sorry.
         </p>
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
           <span className="rounded-lg bg-white/10 px-6 py-3 text-sm text-text-on-dark/60">
@@ -156,15 +135,17 @@ function FeatureCard({
   icon,
   title,
   description,
+  imagePosition,
 }: {
   icon: string;
   title: string;
   description: string;
+  imagePosition?: string;
 }) {
   return (
     <div className="flex flex-col items-center rounded-2xl bg-bg p-6 text-center">
       <div className="mb-4 h-16 w-16 overflow-hidden rounded-xl">
-        <img src={icon} alt={title} className="h-full w-full object-cover" />
+        <img src={icon} alt={title} className="h-full w-full object-cover" style={imagePosition ? { objectPosition: imagePosition } : undefined} />
       </div>
       <h3 className="mb-2 text-lg font-semibold">{title}</h3>
       <p className="text-sm leading-relaxed text-text-secondary">

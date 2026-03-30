@@ -43,7 +43,6 @@ export default function CourtDetailsPage() {
     );
   }
 
-  const activeCount = court.activeUserIds?.length || 0;
   const heroImage = court.photoUrlFull || court.photoUrlCard || court.photoUrl;
 
   return (
@@ -72,16 +71,7 @@ export default function CourtDetailsPage() {
       {/* Court Name & Active Users */}
       <div className="mb-6">
         <h1 className="mb-2 text-3xl font-bold">{court.name}</h1>
-        <p className="mb-4 text-teal">{court.address}</p>
-        {activeCount > 0 ? (
-          <span className="inline-block rounded-full bg-coral-light px-4 py-2 font-bold text-coral">
-            {activeCount} {activeCount === 1 ? "person" : "people"} here now
-          </span>
-        ) : (
-          <span className="inline-block rounded-full bg-surface-variant px-4 py-2 text-text-muted">
-            No one here right now
-          </span>
-        )}
+        <p className="text-teal">{court.address}</p>
       </div>
 
       {/* Get the app CTA */}
@@ -89,7 +79,7 @@ export default function CourtDetailsPage() {
         <img src="/app-icon.png" alt="G.O.A.T.S" className="h-12 w-12 rounded-xl" />
         <div>
           <p className="font-semibold text-teal-dark">
-            Check in and see who&apos;s playing
+            See who&apos;s playing and check in
           </p>
           <p className="text-sm text-text-secondary">
             Download the G.O.A.T.S app for real-time updates
@@ -120,7 +110,7 @@ export default function CourtDetailsPage() {
       {court.goatsTake && (
         <section className="mb-8 rounded-2xl bg-surface p-6 shadow-sm">
           <h2 className="mb-3 text-xl font-bold">
-            <span className="text-gold">G.O.A.T.S</span> Take
+            <span className="text-teal">G.O.A.T.S</span> Take
           </h2>
           <p className="leading-relaxed text-text-secondary">
             {court.goatsTake}

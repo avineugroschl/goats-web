@@ -1,20 +1,91 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Court } from "@/lib/types";
 import Link from "next/link";
 
-type SortOption = "name" | "active" | "baskets";
+const NYC = { lat: 40.7128, lng: -73.9060 };
+
+function getDistanceMiles(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 3958.8;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export default function CourtsPage() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("active");
-  const [filterSetting, setFilterSetting] = useState<string>("All");
-  const [filterAccess, setFilterAccess] = useState<string>("All");
+  const [search, setSearch] = useState(() =>
+    typeof window !== "undefined" ? sessionStorage.getItem("courts_search") || "" : ""
+  );
+  const [filterSetting, setFilterSetting] = useState<string>(() =>
+    typeof window !== "undefined" ? sessionStorage.getItem("courts_setting") || "All" : "All"
+  );
+  const [filterConditions, setFilterConditions] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("courts_conditions");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    }
+    return new Set();
+  });
+  const [showConditionDropdown, setShowConditionDropdown] = useState(false);
+  const conditionDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        conditionDropdownRef.current &&
+        !conditionDropdownRef.current.contains(e.target as Node)
+      ) {
+        setShowConditionDropdown(false);
+      }
+    }
+    if (showConditionDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showConditionDropdown]);
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  }>(NYC);
+  const [hasGeoPermission, setHasGeoPermission] = useState(false);
+  const [customAddress, setCustomAddress] = useState("");
+  const [showAddressInput, setShowAddressInput] = useState(false);
+  const [locationLabel, setLocationLabel] = useState("NYC");
+  const [geocoding, setGeocoding] = useState(false);
+  const addressInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+          setHasGeoPermission(true);
+          setLocationLabel("Your Location");
+        },
+        () => {
+          // Denied — keep NYC default
+        }
+      );
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchCourts() {
@@ -28,6 +99,106 @@ export default function CourtsPage() {
     }
     fetchCourts();
   }, []);
+
+  useEffect(() => {
+    sessionStorage.setItem("courts_search", search);
+  }, [search]);
+
+  useEffect(() => {
+    sessionStorage.setItem("courts_setting", filterSetting);
+  }, [filterSetting]);
+
+  useEffect(() => {
+    sessionStorage.setItem("courts_conditions", JSON.stringify([...filterConditions]));
+  }, [filterConditions]);
+
+  useEffect(() => {
+    if (showAddressInput && addressInputRef.current) {
+      addressInputRef.current.focus();
+    }
+  }, [showAddressInput]);
+
+  const [suggestions, setSuggestions] = useState<
+    { display_name: string; lat: string; lon: string }[]
+  >([]);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  function onAddressChange(value: string) {
+    setCustomAddress(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.trim().length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&limit=5&countrycodes=us`,
+          { headers: { "User-Agent": "GoatsApp-Web" } }
+        );
+        const data = await res.json();
+        setSuggestions(data);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 300);
+  }
+
+  function selectSuggestion(suggestion: {
+    display_name: string;
+    lat: string;
+    lon: string;
+  }) {
+    const shortName =
+      suggestion.display_name.split(",").slice(0, 2).join(",").trim();
+    setUserLocation({
+      lat: parseFloat(suggestion.lat),
+      lng: parseFloat(suggestion.lon),
+    });
+    setLocationLabel(shortName);
+    setShowAddressInput(false);
+    setCustomAddress("");
+    setSuggestions([]);
+  }
+
+  async function geocodeAddress(address: string) {
+    setGeocoding(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=us`,
+        { headers: { "User-Agent": "GoatsApp-Web" } }
+      );
+      const data = await res.json();
+      if (data.length > 0) {
+        const shortName =
+          data[0].display_name.split(",").slice(0, 2).join(",").trim();
+        setUserLocation({
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon),
+        });
+        setLocationLabel(shortName);
+        setShowAddressInput(false);
+        setCustomAddress("");
+        setSuggestions([]);
+      }
+    } finally {
+      setGeocoding(false);
+    }
+  }
+
+  function useMyLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+        setHasGeoPermission(true);
+        setLocationLabel("Your Location");
+        setShowAddressInput(false);
+      });
+    }
+  }
 
   const filtered = useMemo(() => {
     let result = courts;
@@ -45,21 +216,22 @@ export default function CourtsPage() {
       result = result.filter((c) => c.setting === filterSetting);
     }
 
-    if (filterAccess !== "All") {
-      result = result.filter((c) => c.accessType === filterAccess);
+    if (filterConditions.size > 0) {
+      result = result.filter((c) => filterConditions.has(c.courtCondition));
     }
 
     result = [...result].sort((a, b) => {
-      if (sortBy === "active")
-        return (
-          (b.activeUserIds?.length || 0) - (a.activeUserIds?.length || 0)
-        );
-      if (sortBy === "baskets") return b.baskets - a.baskets;
-      return a.name.localeCompare(b.name);
+      const distA = getDistanceMiles(
+        userLocation.lat, userLocation.lng, a.latitude, a.longitude
+      );
+      const distB = getDistanceMiles(
+        userLocation.lat, userLocation.lng, b.latitude, b.longitude
+      );
+      return distA - distB;
     });
 
     return result;
-  }, [courts, search, sortBy, filterSetting, filterAccess]);
+  }, [courts, search, filterSetting, filterConditions, userLocation]);
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-8">
@@ -80,43 +252,134 @@ export default function CourtsPage() {
         className="mb-4 w-full rounded-xl border border-surface-variant bg-surface px-4 py-3 text-text-primary placeholder-text-muted outline-none focus:border-teal"
       />
 
-      {/* Filters & Sort */}
-      <div className="mb-6 flex flex-wrap gap-3">
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as SortOption)}
-          className="rounded-xl border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
-        >
-          <option value="active">Sort: Most Active</option>
-          <option value="name">Sort: Name</option>
-          <option value="baskets">Sort: Most Baskets</option>
-        </select>
+      {/* Location & Filters */}
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-text-muted">Results for:</span>
+          <button
+            onClick={() => setShowAddressInput(!showAddressInput)}
+            className="text-sm font-semibold text-teal hover:text-teal-dark"
+          >
+            {locationLabel}
+          </button>
+          {locationLabel !== "Your Location" && hasGeoPermission && (
+            <button
+              onClick={useMyLocation}
+              className="text-xs text-text-muted hover:text-teal"
+            >
+              (use my location)
+            </button>
+          )}
+          {locationLabel !== "NYC" && locationLabel !== "Your Location" && (
+            <button
+              onClick={() => {
+                setShowAddressInput(false);
+                setCustomAddress("");
+                if (hasGeoPermission) {
+                  useMyLocation();
+                } else {
+                  setUserLocation(NYC);
+                  setLocationLabel("NYC");
+                }
+              }}
+              className="text-xs text-text-muted hover:text-coral"
+            >
+              &times;
+            </button>
+          )}
+        </div>
         <select
           value={filterSetting}
           onChange={(e) => setFilterSetting(e.target.value)}
-          className="rounded-xl border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
+          className="appearance-none rounded-xl border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
         >
           <option value="All">All Settings</option>
           <option value="Outdoor">Outdoor</option>
           <option value="Indoor">Indoor</option>
         </select>
-        <select
-          value={filterAccess}
-          onChange={(e) => setFilterAccess(e.target.value)}
-          className="rounded-xl border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
-        >
-          <option value="All">All Access</option>
-          <option value="Public">Public</option>
-          <option value="Private">Private</option>
-          <option value="Membership Required">Membership</option>
-        </select>
+        <div className="relative" ref={conditionDropdownRef}>
+          <button
+            onClick={() => setShowConditionDropdown((v) => !v)}
+            className="rounded-xl border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
+          >
+            Condition{filterConditions.size > 0 ? ` (${filterConditions.size})` : ""}
+          </button>
+          {showConditionDropdown && (
+            <div className="absolute z-10 mt-1 w-44 rounded-xl border border-surface-variant bg-surface py-1 shadow-lg">
+              {["Very Good", "Good", "Solid", "Okay", "Below Average"].map((c) => (
+                <label
+                  key={c}
+                  className="flex cursor-pointer items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-surface-variant"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filterConditions.has(c)}
+                    onChange={() => {
+                      setFilterConditions((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(c)) next.delete(c);
+                        else next.add(c);
+                        return next;
+                      });
+                    }}
+                    className="accent-teal"
+                  />
+                  {c}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Results count */}
-      {!loading && (
-        <p className="mb-4 text-sm text-text-muted">
-          {filtered.length} court{filtered.length !== 1 ? "s" : ""} found
-        </p>
+      {/* Address Input */}
+      {showAddressInput && (
+        <div className="relative mb-6">
+          <div className="flex gap-2">
+            <input
+              ref={addressInputRef}
+              type="text"
+              placeholder="Enter an address..."
+              value={customAddress}
+              onChange={(e) => onAddressChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && customAddress.trim()) {
+                  setSuggestions([]);
+                  geocodeAddress(customAddress.trim());
+                }
+              }}
+              className="flex-1 rounded-xl border border-surface-variant bg-surface px-4 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-teal"
+            />
+            <button
+              onClick={() => {
+                if (customAddress.trim()) {
+                  setSuggestions([]);
+                  geocodeAddress(customAddress.trim());
+                }
+              }}
+              disabled={geocoding}
+              className="rounded-xl bg-teal px-4 py-2 text-sm font-semibold text-text-on-dark hover:bg-teal-dark disabled:opacity-50"
+            >
+              {geocoding ? "..." : "Go"}
+            </button>
+          </div>
+          {suggestions.length > 0 && (
+            <div className="absolute z-10 mt-1 w-full rounded-xl border border-surface-variant bg-surface shadow-lg">
+              {suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectSuggestion(s);
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm text-text-primary hover:bg-surface-variant first:rounded-t-xl last:rounded-b-xl"
+                >
+                  {s.display_name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Court List */}
@@ -129,7 +392,11 @@ export default function CourtsPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {filtered.map((court) => (
-            <CourtCard key={court.id} court={court} />
+            <CourtCard
+              key={court.id}
+              court={court}
+              userLocation={userLocation}
+            />
           ))}
         </div>
       )}
@@ -137,9 +404,20 @@ export default function CourtsPage() {
   );
 }
 
-function CourtCard({ court }: { court: Court }) {
-  const activeCount = court.activeUserIds?.length || 0;
+function CourtCard({
+  court,
+  userLocation,
+}: {
+  court: Court;
+  userLocation: { lat: number; lng: number };
+}) {
   const imageUrl = court.photoUrlCard || court.photoUrl;
+  const distance = getDistanceMiles(
+    userLocation.lat,
+    userLocation.lng,
+    court.latitude,
+    court.longitude
+  );
 
   return (
     <Link
@@ -174,17 +452,13 @@ function CourtCard({ court }: { court: Court }) {
         </div>
       </div>
 
-      {/* Active Users Badge */}
+      {/* Distance */}
       <div className="flex flex-shrink-0 items-center">
-        {activeCount > 0 ? (
-          <span className="rounded-full bg-coral-light px-3 py-1 text-sm font-bold text-coral">
-            {activeCount} here
-          </span>
-        ) : (
-          <span className="rounded-full bg-surface-variant px-3 py-1 text-xs text-text-muted">
-            No one here
-          </span>
-        )}
+        <span className="text-sm font-medium text-coral">
+          {distance < 0.1
+            ? `${Math.round(distance * 5280)} ft`
+            : `${distance.toFixed(1)} mi`}
+        </span>
       </div>
     </Link>
   );
