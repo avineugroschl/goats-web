@@ -6,7 +6,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const courtsSnapshot = await getDocs(collection(db, "courts"));
   const courtEntries: MetadataRoute.Sitemap = courtsSnapshot.docs.map(
     (doc) => ({
-      url: `https://azazelsports.com/courts/${doc.id}`,
+      url: `https://goatssportsapp.com/courts/${doc.id}`,
       lastModified: new Date(),
       changeFrequency: "daily",
       priority: 0.7,
@@ -15,13 +15,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     {
-      url: "https://azazelsports.com",
+      url: "https://goatssportsapp.com",
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 1,
     },
     {
-      url: "https://azazelsports.com/courts",
+      url: "https://goatssportsapp.com/courts",
       lastModified: new Date(),
       changeFrequency: "daily",
       priority: 0.9,

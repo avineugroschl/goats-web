@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://azazelsports.com"),
+  metadataBase: new URL("https://goatssportsapp.com"),
   title: {
     default: "G.O.A.T.S - Find Pickup Basketball Courts Near You",
     template: "%s | G.O.A.T.S - Pickup Basketball App",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://azazelsports.com",
+    url: "https://goatssportsapp.com",
     siteName: "G.O.A.T.S - Pickup Basketball",
     title: "G.O.A.T.S - Find Pickup Basketball Courts Near You",
     description:
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     follow: true,
   },
   alternates: {
-    canonical: "https://azazelsports.com",
+    canonical: "https://goatssportsapp.com",
   },
 };
 
@@ -59,7 +59,7 @@ const jsonLd = {
   operatingSystem: "iOS, Android",
   description:
     "Find pickup basketball courts near you, see who's playing in real time, check in, and rate other players. The ultimate pickup basketball app.",
-  url: "https://azazelsports.com",
+  url: "https://goatssportsapp.com",
   offers: {
     "@type": "Offer",
     price: "0",
