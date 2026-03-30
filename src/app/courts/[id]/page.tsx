@@ -51,14 +51,15 @@ export default function CourtDetailsPage() {
       {/* Back link */}
       <Link
         href="/courts"
-        className="mb-6 inline-block text-teal hover:text-teal-dark"
+        className="mb-6 inline-flex items-center gap-2 text-teal hover:text-teal-dark"
       >
-        &larr; Back to courts
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        Back to courts
       </Link>
 
       {/* Hero Image */}
       {heroImage && (
-        <div className="mb-6 overflow-hidden rounded-2xl">
+        <div className="mb-6 overflow-hidden rounded-2xl shadow-lg">
           <img
             src={heroImage}
             alt={court.name}
@@ -71,9 +72,9 @@ export default function CourtDetailsPage() {
       {/* Court Name & Active Users */}
       <div className="mb-6">
         <h1 className="mb-2 text-3xl font-bold">{court.name}</h1>
-        <p className="mb-3 text-teal">{court.address}</p>
+        <p className="mb-4 text-teal">{court.address}</p>
         {activeCount > 0 ? (
-          <span className="inline-block rounded-full bg-coral/20 px-4 py-2 font-bold text-coral">
+          <span className="inline-block rounded-full bg-coral-light px-4 py-2 font-bold text-coral">
             {activeCount} {activeCount === 1 ? "person" : "people"} here now
           </span>
         ) : (
@@ -84,20 +85,22 @@ export default function CourtDetailsPage() {
       </div>
 
       {/* Get the app CTA */}
-      <div className="mb-8 rounded-xl border border-coral/30 bg-surface p-4 text-center">
-        <p className="mb-1 font-semibold text-coral">
-          Want to check in and see who&apos;s playing?
-        </p>
-        <p className="text-sm text-text-secondary">
-          Download the <span className="font-semibold text-text-primary">G.O.A.T.S</span> app to
-          check in, rate players, and get real-time updates.
-        </p>
+      <div className="mb-8 flex items-center gap-4 rounded-2xl bg-teal-light p-5">
+        <img src="/app-icon.png" alt="G.O.A.T.S" className="h-12 w-12 rounded-xl" />
+        <div>
+          <p className="font-semibold text-teal-dark">
+            Check in and see who&apos;s playing
+          </p>
+          <p className="text-sm text-text-secondary">
+            Download the G.O.A.T.S app for real-time updates
+          </p>
+        </div>
       </div>
 
       {/* Court Info */}
-      <section className="mb-8 rounded-xl bg-surface p-6">
+      <section className="mb-8 rounded-2xl bg-surface p-6 shadow-sm">
         <h2 className="mb-4 text-xl font-bold">Court Details</h2>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-y-5 gap-x-8">
           <InfoRow label="Baskets" value={String(court.baskets)} />
           <InfoRow label="Setting" value={court.setting} />
           <InfoRow label="Access" value={court.accessType} />
@@ -115,7 +118,7 @@ export default function CourtDetailsPage() {
 
       {/* Goats Take */}
       {court.goatsTake && (
-        <section className="mb-8 rounded-xl bg-surface p-6">
+        <section className="mb-8 rounded-2xl bg-surface p-6 shadow-sm">
           <h2 className="mb-3 text-xl font-bold">
             <span className="text-gold">G.O.A.T.S</span> Take
           </h2>
@@ -131,9 +134,10 @@ export default function CourtDetailsPage() {
           href={`https://www.google.com/maps/search/?api=1&query=${court.latitude},${court.longitude}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="mb-8 block rounded-xl bg-surface p-4 text-center text-teal transition-colors hover:bg-surface-variant"
+          className="mb-8 flex items-center justify-center gap-2 rounded-2xl bg-surface p-4 text-teal shadow-sm transition-shadow hover:shadow-md"
         >
-          Open in Google Maps &rarr;
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          Open in Google Maps
         </a>
       )}
 
@@ -141,7 +145,7 @@ export default function CourtDetailsPage() {
       <div className="py-8 text-center">
         <Link
           href="/"
-          className="inline-block rounded-full bg-coral px-8 py-3 font-semibold text-bg transition-colors hover:bg-coral-dark"
+          className="inline-block rounded-full bg-coral px-8 py-3 font-semibold text-text-on-dark transition-colors hover:bg-coral-dark"
         >
           Get the G.O.A.T.S App
         </Link>
@@ -153,8 +157,10 @@ export default function CourtDetailsPage() {
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-text-muted">{label}</p>
-      <p className="font-medium">{value}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+        {label}
+      </p>
+      <p className="mt-0.5 font-semibold">{value}</p>
     </div>
   );
 }

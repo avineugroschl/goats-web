@@ -50,7 +50,10 @@ export default function CourtsPage() {
     }
 
     result = [...result].sort((a, b) => {
-      if (sortBy === "active") return (b.activeUserIds?.length || 0) - (a.activeUserIds?.length || 0);
+      if (sortBy === "active")
+        return (
+          (b.activeUserIds?.length || 0) - (a.activeUserIds?.length || 0)
+        );
       if (sortBy === "baskets") return b.baskets - a.baskets;
       return a.name.localeCompare(b.name);
     });
@@ -61,23 +64,20 @@ export default function CourtsPage() {
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-8">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <Link href="/" className="text-teal hover:text-teal-dark">
-          &larr; Home
+      <div className="mb-6 flex items-center gap-4">
+        <Link href="/" className="flex items-center gap-2 text-teal hover:text-teal-dark">
+          <img src="/app-icon.png" alt="G.O.A.T.S" className="h-8 w-8 rounded-lg" />
         </Link>
-        <h1 className="text-2xl font-bold">
-          Basketball Courts
-        </h1>
-        <div className="w-16" />
+        <h1 className="text-2xl font-bold">G.O.A.T.S</h1>
       </div>
 
       {/* Search */}
       <input
         type="text"
-        placeholder="Search courts by name or address..."
+        placeholder="Search for a court..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-4 w-full rounded-lg border border-surface-variant bg-surface px-4 py-3 text-text-primary placeholder-text-muted outline-none focus:border-teal"
+        className="mb-4 w-full rounded-xl border border-surface-variant bg-surface px-4 py-3 text-text-primary placeholder-text-muted outline-none focus:border-teal"
       />
 
       {/* Filters & Sort */}
@@ -85,7 +85,7 @@ export default function CourtsPage() {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortOption)}
-          className="rounded-lg border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
+          className="rounded-xl border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
         >
           <option value="active">Sort: Most Active</option>
           <option value="name">Sort: Name</option>
@@ -94,7 +94,7 @@ export default function CourtsPage() {
         <select
           value={filterSetting}
           onChange={(e) => setFilterSetting(e.target.value)}
-          className="rounded-lg border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
+          className="rounded-xl border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
         >
           <option value="All">All Settings</option>
           <option value="Outdoor">Outdoor</option>
@@ -103,7 +103,7 @@ export default function CourtsPage() {
         <select
           value={filterAccess}
           onChange={(e) => setFilterAccess(e.target.value)}
-          className="rounded-lg border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
+          className="rounded-xl border border-surface-variant bg-surface px-3 py-2 text-sm text-text-primary outline-none"
         >
           <option value="All">All Access</option>
           <option value="Public">Public</option>
@@ -144,10 +144,10 @@ function CourtCard({ court }: { court: Court }) {
   return (
     <Link
       href={`/courts/${court.id}`}
-      className="flex gap-4 rounded-xl bg-surface p-3 transition-colors hover:bg-surface-variant"
+      className="flex gap-4 rounded-2xl bg-surface p-3 shadow-sm transition-shadow hover:shadow-md"
     >
       {/* Thumbnail */}
-      <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-surface-variant">
+      <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl bg-surface-variant">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -155,34 +155,34 @@ function CourtCard({ court }: { court: Court }) {
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-2xl">
-            &#127936;
+          <div className="flex h-full w-full items-center justify-center text-text-muted">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
           </div>
         )}
       </div>
 
       {/* Info */}
       <div className="flex min-w-0 flex-1 flex-col justify-center">
-        <h2 className="truncate text-lg font-bold">{court.name}</h2>
+        <h2 className="truncate text-base font-bold">{court.name}</h2>
         <p className="truncate text-sm text-teal">{court.address}</p>
         <div className="mt-1 flex items-center gap-3 text-sm">
-          <span className="text-text-primary">
+          <span className="text-text-secondary">
             {court.baskets} basket{court.baskets !== 1 ? "s" : ""}
           </span>
           <span className="font-medium text-teal">{court.setting}</span>
-          <span className="text-text-secondary">{court.accessType}</span>
+          <span className="text-text-muted">{court.accessType}</span>
         </div>
       </div>
 
       {/* Active Users Badge */}
       <div className="flex flex-shrink-0 items-center">
         {activeCount > 0 ? (
-          <span className="rounded-full bg-coral/20 px-3 py-1 text-sm font-bold text-coral">
-            {activeCount} &#9899;
+          <span className="rounded-full bg-coral-light px-3 py-1 text-sm font-bold text-coral">
+            {activeCount} here
           </span>
         ) : (
           <span className="rounded-full bg-surface-variant px-3 py-1 text-xs text-text-muted">
-            Empty
+            No one here
           </span>
         )}
       </div>
