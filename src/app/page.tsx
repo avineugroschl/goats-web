@@ -15,12 +15,12 @@ export default function Home() {
           />
           <span className="text-xl font-bold tracking-tight">G.O.A.T.S</span>
         </div>
-        <Link
-          href="/courts"
+        <a
+          href="#get-the-app"
           className="rounded-full bg-teal px-5 py-2 text-sm font-semibold text-text-on-dark transition-colors hover:bg-teal-dark"
         >
-          Browse Courts
-        </Link>
+          Get the App
+        </a>
       </nav>
 
       {/* Hero */}
@@ -101,7 +101,7 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section className="bg-surface-dark px-6 py-20 text-center sm:px-12">
+      <section id="get-the-app" className="bg-surface-dark px-6 py-20 text-center sm:px-12 scroll-mt-16">
         <img
           src="/app-icon.png"
           alt="G.O.A.T.S"
