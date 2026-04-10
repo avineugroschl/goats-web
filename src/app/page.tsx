@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
@@ -15,16 +16,24 @@ export default function Home() {
           />
           <span className="text-xl font-bold tracking-tight">G.O.A.T.S</span>
         </div>
-        <a
-          href="#get-the-app"
-          className="rounded-full bg-teal px-5 py-2 text-sm font-semibold text-text-on-dark transition-colors hover:bg-teal-dark"
-        >
-          Get the App
-        </a>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/operator"
+            className="text-sm font-medium text-text-secondary transition-colors hover:text-teal"
+          >
+            Court Operators
+          </Link>
+          <a
+            href="#get-the-app"
+            className="rounded-full bg-teal px-5 py-2 text-sm font-semibold text-text-on-dark transition-colors hover:bg-teal-dark"
+          >
+            Get the App
+          </a>
+        </div>
       </nav>
 
       {/* Hero */}
-      <section className="flex flex-col items-center px-6 pt-16 pb-20 sm:px-12 lg:flex-row lg:items-center lg:justify-between lg:pt-24 lg:pb-28">
+      <section className="mx-auto flex max-w-6xl flex-col items-center px-6 pt-16 pb-20 sm:px-12 lg:flex-row lg:items-center lg:justify-center lg:gap-16 lg:pt-24 lg:pb-28">
         {/* Left side - text */}
         <div className="mb-12 max-w-xl text-center lg:mb-0 lg:text-left">
           <h1 className="mb-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
@@ -53,14 +62,14 @@ export default function Home() {
 
         {/* Right side - phone screenshots */}
         <div className="relative flex gap-4">
-          <div className="w-44 -rotate-3 overflow-hidden rounded-3xl shadow-2xl sm:w-52">
+          <div className="w-52 -rotate-3 overflow-hidden rounded-3xl bg-surface-dark shadow-2xl sm:w-64">
             <img
               src="/screenshot-welcome.jpg"
               alt="G.O.A.T.S welcome screen"
               className="w-full"
             />
           </div>
-          <div className="w-44 translate-y-8 rotate-3 overflow-hidden rounded-3xl shadow-2xl sm:w-52">
+          <div className="w-52 translate-y-8 rotate-3 overflow-hidden rounded-3xl bg-surface-dark shadow-2xl sm:w-64">
             <img
               src="/screenshot-courts-active.jpg"
               alt="G.O.A.T.S courts list showing active players"
@@ -123,10 +132,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-surface-variant px-6 py-8 text-center text-sm text-text-muted">
-        <p>&copy; {new Date().getFullYear()} G.O.A.T.S. All rights reserved.</p>
-      </footer>
+      <Footer />
     </main>
   );
 }

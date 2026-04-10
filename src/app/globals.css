@@ -15,16 +15,69 @@
   --color-coral-dark: #E86A3A;
   --color-coral-light: #FFF0EB;
   --color-gold: #C9A227;
+  --color-gold-light: #FBF5E0;
+
+  /* Operator dashboard dark palette */
+  --color-dash-bg: #0A0A0A;
+  --color-dash-sidebar: #111111;
+  --color-dash-surface: #1A1A1A;
+  --color-dash-surface-hover: #222222;
+  --color-dash-border: #2A2A2A;
+  --color-dash-text: #E5E5E5;
+  --color-dash-text-muted: #777777;
+
+  /* Status colors */
+  --color-status-pending: #F59E0B;
+  --color-status-confirmed: #22C55E;
+  --color-status-rejected: #EF4444;
+  --color-status-manual: #8B5CF6;
 
   /* Text on light backgrounds */
   --color-text-primary: #1A1A1A;
   --color-text-secondary: #555555;
   --color-text-muted: #999999;
   --color-text-on-dark: #FFFFFF;
+
+  /* Font families */
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
 }
 
 body {
   background-color: var(--color-bg);
   color: var(--color-text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-body);
+}
+
+/* Operator section typography */
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for dashboard */
+.dash-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.dash-scroll::-webkit-scrollbar-track {
+  background: var(--color-dash-bg);
+}
+.dash-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-dash-border);
+  border-radius: 3px;
+}
+.dash-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-dash-text-muted);
+}
+
+/* Calendar grid lines */
+.calendar-grid {
+  background-image:
+    linear-gradient(var(--color-dash-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-dash-border) 1px, transparent 1px);
+  background-size: 1fr 60px;
 }

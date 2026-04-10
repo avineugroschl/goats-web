@@ -1,0 +1,157 @@
+import Link from "next/link";
+import Footer from "@/components/Footer";
+
+export const metadata = {
+  title: "Terms of Service — G.O.A.T.S",
+};
+
+export default function TermsOfService() {
+  return (
+    <main className="min-h-screen bg-surface-dark">
+      <nav className="flex items-center justify-between px-6 py-4 sm:px-12">
+        <Link href="/" className="flex items-center gap-3">
+          <img src="/app-icon.png" alt="G.O.A.T.S" className="h-10 w-10 rounded-xl" />
+          <span className="font-display text-xl font-bold tracking-tight text-text-on-dark">G.O.A.T.S</span>
+        </Link>
+      </nav>
+
+      <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
+        <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Terms of Service</h1>
+        <p className="mb-12 text-sm text-white/30">Last updated: April 10, 2026</p>
+
+        <div className="space-y-10 text-sm leading-relaxed text-white/60">
+          <Section title="1. Acceptance of Terms">
+            <p>
+              By accessing or using the G.O.A.T.S mobile application or website (collectively, the &quot;Service&quot;),
+              you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the Service.
+            </p>
+          </Section>
+
+          <Section title="2. Description of Service">
+            <p>
+              G.O.A.T.S is a basketball court discovery and community platform. The Service allows users to find
+              courts, check in to courts, rate other players, and communicate with the basketball community. Court
+              operators may use the Service to manage their courts, publish announcements, and communicate with players.
+            </p>
+          </Section>
+
+          <Section title="3. User Accounts">
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>You must provide accurate information when creating an account.</li>
+              <li>You are responsible for maintaining the security of your account credentials.</li>
+              <li>You must be at least 13 years old to use the Service.</li>
+              <li>One account per person. Creating multiple accounts to manipulate ratings or circumvent restrictions is prohibited.</li>
+            </ul>
+          </Section>
+
+          <Section title="4. Acceptable Use">
+            <p className="mb-3">You agree not to:</p>
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>Submit false or misleading ratings of other players</li>
+              <li>Harass, bully, or intimidate other users through ratings, chat, or comments</li>
+              <li>Impersonate another person or misrepresent your identity</li>
+              <li>Post inappropriate, offensive, or illegal content in chat or comments</li>
+              <li>Attempt to manipulate check-in data or location information</li>
+              <li>Interfere with or disrupt the Service or its infrastructure</li>
+              <li>Use the Service for any purpose other than its intended use</li>
+            </ul>
+          </Section>
+
+          <Section title="5. Court Operator Terms">
+            <p className="mb-3">Court operators who subscribe to the operator plan additionally agree to:</p>
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>Provide accurate information about their court (address, hours, conditions).</li>
+              <li>Use push notifications responsibly (maximum 2 per day, relevant content only).</li>
+              <li>Not use announcements or promotions for misleading or deceptive purposes.</li>
+              <li>Pay the applicable subscription fee. Subscriptions are billed monthly and can be cancelled at any time, with access continuing through the end of the billing period.</li>
+              <li>Understand that cancelling the subscription does not remove the court from the app. The court remains listed but is no longer managed.</li>
+            </ul>
+          </Section>
+
+          <Section title="6. Player Ratings">
+            <p>
+              The rating system is designed to reflect genuine basketball skill assessments based on playing together.
+              Ratings should be honest and based on actual gameplay. Coordinated rating manipulation, revenge ratings,
+              or ratings based on factors other than basketball skill are prohibited and may result in account suspension.
+            </p>
+          </Section>
+
+          <Section title="7. Content and Intellectual Property">
+            <p>
+              You retain ownership of content you submit (photos, comments, chat messages). By posting content to the
+              Service, you grant G.O.A.T.S a non-exclusive, royalty-free license to display that content within the
+              Service. You represent that you have the right to share any content you upload. We may remove content
+              that violates these terms without notice. If you believe content on the Service infringes your copyright,
+              contact us at office@goatssportsapp.com and we will promptly review and remove infringing material.
+            </p>
+          </Section>
+
+          <Section title="8. Payments and Refunds">
+            <p>
+              Operator subscriptions are processed by Stripe. By subscribing, you agree to Stripe&apos;s terms of
+              service. Subscription fees are non-refundable for partial billing periods. If you cancel, you retain
+              access until the end of your current billing period.
+            </p>
+          </Section>
+
+          <Section title="9. Termination">
+            <p>
+              We reserve the right to suspend or terminate accounts that violate these terms. You may delete your
+              account at any time. See our <Link href="/delete-account" className="text-teal hover:underline">account deletion page</Link> for
+              instructions.
+            </p>
+          </Section>
+
+          <Section title="10. Disclaimers">
+            <p>
+              The Service is provided &quot;as is&quot; without warranties of any kind. We do not guarantee the
+              accuracy of court information, player ratings, or real-time check-in data. We are not responsible for
+              interactions between users at courts. Use the Service at your own risk.
+            </p>
+          </Section>
+
+          <Section title="11. Limitation of Liability">
+            <p>
+              To the maximum extent permitted by law, G.O.A.T.S shall not be liable for any indirect, incidental,
+              special, or consequential damages arising from your use of the Service.
+            </p>
+          </Section>
+
+          <Section title="12. Governing Law">
+            <p>
+              These Terms are governed by and construed in accordance with the laws of the State of New York,
+              without regard to its conflict of law provisions.
+            </p>
+          </Section>
+
+          <Section title="13. Changes to Terms">
+            <p>
+              We may update these Terms from time to time. Continued use of the Service after changes constitutes
+              acceptance of the updated terms. We will notify users of significant changes through the app or by email.
+            </p>
+          </Section>
+
+          <Section title="14. Contact">
+            <p>
+              Questions about these Terms? Contact us at{" "}
+              <a href="mailto:office@goatssportsapp.com" className="text-teal hover:underline">office@goatssportsapp.com</a>
+              {" "}or{" "}
+              <a href="tel:8457467745" className="text-teal hover:underline">(845) 746-7745</a>.
+            </p>
+          </Section>
+        </div>
+      </article>
+
+      <Footer />
+    </main>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="font-display mb-3 text-lg font-bold text-white">{title}</h2>
+      {children}
+    </section>
+  );
+}
