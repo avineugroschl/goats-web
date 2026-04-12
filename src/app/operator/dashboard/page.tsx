@@ -335,7 +335,7 @@ export default function DashboardOverview() {
     );
   }
 
-  const liveCount = court?.currentUsers ?? 0;
+  const liveCount = court?.activeUserIds?.length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -413,7 +413,7 @@ export default function DashboardOverview() {
                 }}
                 labelStyle={{ color: "#E5E5E5", fontWeight: 600 }}
                 itemStyle={{ color: "#3ECFB2" }}
-                formatter={(v: number) => [v, "check-ins"]}
+                formatter={(v) => [v as number, "check-ins"]}
               />
               <Line
                 type="monotone"
@@ -612,7 +612,7 @@ function HourlyModal({
                     borderRadius: 12,
                     fontSize: 12,
                   }}
-                  formatter={(v: number) => [v, "avg check-ins"]}
+                  formatter={(v) => [v as number, "avg check-ins"]}
                 />
                 <Bar dataKey="avg" fill="#3ECFB2" radius={[6, 6, 0, 0]} />
               </BarChart>
@@ -724,7 +724,7 @@ function FollowersChart({ courtId }: { courtId: string }) {
                 }}
                 labelStyle={{ color: "#E5E5E5", fontWeight: 600 }}
                 itemStyle={{ color: "#FF7F50" }}
-                formatter={(v: number) => [v, "followers"]}
+                formatter={(v) => [v as number, "followers"]}
               />
               <Line
                 type="monotone"

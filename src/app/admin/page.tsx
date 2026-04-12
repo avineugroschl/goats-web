@@ -580,7 +580,8 @@ function CommentsPanel() {
   useEffect(() => {
     (async () => {
       const snap = await getDocs(query(collection(db, "comments"), orderBy("timestamp", "desc"), limit(50)));
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
       setComments(list);
 
       // Cache court names
@@ -664,7 +665,7 @@ function ProfilePicsPanel() {
   useEffect(() => {
     (async () => {
       const snap = await getDocs(query(collection(db, "users"), limit(100)));
-      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((u) => u.photoUrl));
+      setUsers((snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]).filter((u) => u.photoUrl));
       setLoading(false);
     })();
   }, []);
@@ -706,7 +707,7 @@ function CheckInsPanel() {
   useEffect(() => {
     (async () => {
       const snap = await getDocs(query(collection(db, "courtVisits"), orderBy("checkInTime", "desc"), limit(50)));
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
       setVisits(list);
 
       const userIds = [...new Set(list.map((v) => v.userId as string).filter(Boolean))];
@@ -753,7 +754,7 @@ function RatingsPanel() {
   useEffect(() => {
     (async () => {
       const snap = await getDocs(query(collection(db, "court_ratings"), orderBy("timestamp", "desc"), limit(50)));
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
       setRatings(list);
 
       const userIds = [...new Set([

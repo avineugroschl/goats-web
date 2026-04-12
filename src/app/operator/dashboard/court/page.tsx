@@ -165,7 +165,9 @@ export default function CourtManagement() {
         setBannerText(banner?.text ?? "");
         if (banner?.expiresAt?.toDate) {
           setBannerExpiry("custom");
-          setBannerCustomExpiry(banner.expiresAt.toDate().toISOString().slice(0, 16));
+          const d = banner.expiresAt.toDate();
+          const localISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+          setBannerCustomExpiry(localISO);
         } else {
           setBannerExpiry("never");
           setBannerCustomExpiry("");
@@ -286,9 +288,35 @@ export default function CourtManagement() {
     setPublishing(true);
     setError("");
     try {
-      // Save current form values + flip published to true in one call
+      // Save ALL form values across all tabs + flip published to true.
+      // This ensures unsaved changes on any tab are included.
+      const bannerData: Record<string, unknown> | null = bannerText.trim()
+        ? (() => {
+            const bd: Record<string, unknown> = { text: bannerText.trim(), updatedAt: serverTimestamp() };
+            if (bannerExpiry !== "never") {
+              const now = new Date();
+              let expiresAt: Date;
+              switch (bannerExpiry) {
+                case "1h": expiresAt = new Date(now.getTime() + 60 * 60 * 1000); break;
+                case "6h": expiresAt = new Date(now.getTime() + 6 * 60 * 60 * 1000); break;
+                case "endOfDay": expiresAt = new Date(now); expiresAt.setHours(23, 59, 59, 999); break;
+                case "24h": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
+                case "custom": expiresAt = bannerCustomExpiry ? new Date(bannerCustomExpiry) : new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
+                default: expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+              }
+              bd.expiresAt = expiresAt;
+            }
+            return bd;
+          })()
+        : null;
+
       await updateDoc(doc(db, "courts", courtId), {
         ...buildCourtUpdates(),
+        schedule,
+        scheduleEnabled,
+        scheduleOverrides,
+        operatorBanner: bannerData,
+        promo: { active: promoActive, text: promoText.trim() },
         published: true,
       });
       await loadCourt(courtId);
