@@ -500,11 +500,11 @@ export default function CourtManagement() {
               <Input value={address} onChange={setAddress} placeholder="123 Main St, City, State" />
             </Field>
 
-            <Field label="Tell us about your court *">
+            <Field label="Court Description *">
               <TextArea
                 value={description}
                 onChange={setDescription}
-                placeholder="What makes your court special — amenities, parking, vibe, anything players should know..."
+                placeholder="Tell users everything about your court — amenities, parking, vibe, anything players should know..."
               />
             </Field>
 
@@ -569,6 +569,9 @@ export default function CourtManagement() {
                 onChange={setHoursOfOperation}
                 placeholder="e.g. Mon-Fri 6am-10pm, Sat-Sun 8am-8pm"
               />
+              <p className="mt-1 text-xs text-dash-text-muted">
+                Or set up your schedule to be displayed automatically in the Schedule tab.
+              </p>
             </Field>
 
             <Field label="Phone Number *">

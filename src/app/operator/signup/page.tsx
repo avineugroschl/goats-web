@@ -516,7 +516,7 @@ export default function OperatorSignup() {
           {step === "court" && (
             <div>
               <h2 className="font-display mb-1 text-2xl font-bold text-white">
-                Tell us about your court
+                Court Details
               </h2>
               <p className="mb-8 text-sm text-white/40">
                 Add a new court or claim one already listed on G.O.A.T.S. You can finish
@@ -563,10 +563,10 @@ export default function OperatorSignup() {
                   />
 
                   <TextAreaField
-                    label="Tell us about your court *"
+                    label="Court Description *"
                     value={courtData.description}
                     onChange={(v) => setCourtData({ ...courtData, description: v })}
-                    placeholder="What makes your court special — amenities, parking, vibe, anything players should know..."
+                    placeholder="Tell users everything about your court — amenities, parking, vibe, anything players should know..."
                   />
 
                   <div className="pt-2 text-xs font-medium uppercase tracking-wider text-white/30">
