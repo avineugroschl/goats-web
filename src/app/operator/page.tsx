@@ -77,7 +77,7 @@ export default function OperatorLanding() {
     <main className="min-h-screen bg-surface-dark">
       {/* Nav */}
       <nav className="flex items-center justify-between px-6 py-4 sm:px-12">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">
           <img
             src="/app-icon.png"
             alt="G.O.A.T.S"

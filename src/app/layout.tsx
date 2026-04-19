@@ -26,6 +26,11 @@ export const metadata: Metadata = {
     "who's playing basketball",
     "local basketball",
     "basketball court map",
+    "NYC basketball courts",
+    "basketball courts New York",
+    "pickup basketball NYC",
+    "basketball courts Brooklyn",
+    "basketball courts Manhattan",
   ],
   openGraph: {
     type: "website",

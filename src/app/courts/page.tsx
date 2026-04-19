@@ -237,10 +237,10 @@ export default function CourtsPage() {
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-8">
       {/* Header */}
       <div className="mb-6 flex items-center gap-4">
-        <Link href="/" className="flex items-center gap-2 text-teal hover:text-teal-dark">
+        <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">
           <img src="/app-icon.png" alt="G.O.A.T.S" className="h-8 w-8 rounded-lg" />
+          <h1 className="text-2xl font-bold">G.O.A.T.S</h1>
         </Link>
-        <h1 className="text-2xl font-bold">G.O.A.T.S</h1>
       </div>
 
       {/* Search */}
