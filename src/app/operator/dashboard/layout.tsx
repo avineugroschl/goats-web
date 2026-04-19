@@ -309,6 +309,7 @@ function PendingState() {
           We&apos;re reviewing your application. This usually takes 24-48 hours.
           You&apos;ll get full access to your dashboard once approved.
         </p>
+        <DeleteAccountButton />
       </div>
     </div>
   );
@@ -330,6 +331,7 @@ function RejectedState() {
           Unfortunately your application wasn&apos;t approved at this time.
           If you believe this is a mistake, reach out to us.
         </p>
+        <DeleteAccountButton />
       </div>
     </div>
   );
@@ -424,6 +426,64 @@ function PaymentRequiredState() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DeleteAccountButton() {
+  const router = useRouter();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  return (
+    <div className="mt-8">
+      {error && <p className="mb-3 text-sm text-status-rejected">{error}</p>}
+
+      {!showConfirm ? (
+        <button
+          onClick={() => setShowConfirm(true)}
+          className="text-xs text-white/30 transition-colors hover:text-status-rejected"
+        >
+          Delete operator account
+        </button>
+      ) : (
+        <div className="rounded-xl border border-status-rejected/30 bg-dash-bg p-5 text-left">
+          <p className="mb-4 text-sm font-semibold text-white">
+            Are you sure? This cannot be undone.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                setLoading(true);
+                setError("");
+                try {
+                  const deleteFn = httpsCallable(functions, "deleteOperatorAccount");
+                  await deleteFn();
+                  await signOut(auth);
+                  router.push("/operator");
+                } catch (err: unknown) {
+                  const msg = (err as { message?: string })?.message ?? "Failed to delete account";
+                  setError(msg);
+                  setShowConfirm(false);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              className="rounded-xl bg-status-rejected px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-status-rejected/80 disabled:opacity-50"
+            >
+              {loading ? "Deleting..." : "Yes, Delete"}
+            </button>
+            <button
+              onClick={() => setShowConfirm(false)}
+              className="rounded-xl border border-dash-border px-5 py-2.5 text-xs text-white/40 hover:text-white/60"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
