@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             subscriptionStatus: data.subscriptionStatus ?? "none",
             subscriptionExpiresAt: data.subscriptionExpiresAt ?? undefined,
             applicationStatus: data.applicationStatus,
+            freeAccess: data.freeAccess ?? false,
           });
           return;
         }
