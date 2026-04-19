@@ -25,7 +25,7 @@ import { useAuth } from "@/lib/auth-context";
 import { OperatorApplication, NewCourtData } from "@/lib/types";
 
 type AdminTab = "applications" | "courts" | "dashboard";
-type DashTab = "comments" | "users" | "profilePics" | "checkIns" | "ratings";
+type DashTab = "comments" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN ADMIN PAGE
@@ -185,12 +185,16 @@ function ApplicationsTab() {
         });
         courtId = newCourtId;
       } else if (app.type === "claim_existing" && courtId) {
-        const courtSnap = await getDocs(query(collection(db, "courts")));
-        const courtDoc = courtSnap.docs.find((d) => d.id === courtId);
-        if (courtDoc) {
-          const existing = courtDoc.data().operatorIds ?? [];
+        const courtSnap = await getDoc(doc(db, "courts", courtId));
+        if (courtSnap.exists()) {
+          const existing = courtSnap.data().operatorIds ?? [];
+          if (existing.length > 0) {
+            alert("This court already has an operator. Reject this application or remove the existing operator first.");
+            setActionLoading(null);
+            return;
+          }
           await updateDoc(doc(db, "courts", courtId), {
-            operatorIds: [...existing, app.applicantId],
+            operatorIds: [app.applicantId],
             verified: true,
           });
         }
@@ -553,6 +557,7 @@ function DashboardTab() {
           { id: "profilePics" as const, label: "Profile Pics" },
           { id: "checkIns" as const, label: "Check-Ins" },
           { id: "ratings" as const, label: "Ratings" },
+          { id: "deletedOperators" as const, label: "Deleted Operators" },
         ]).map((tab) => (
           <button key={tab.id} onClick={() => setDashTab(tab.id)}
             className={`rounded-lg px-4 py-2 font-display text-xs font-bold transition-all ${
@@ -568,6 +573,7 @@ function DashboardTab() {
       {dashTab === "profilePics" && <ProfilePicsPanel />}
       {dashTab === "checkIns" && <CheckInsPanel />}
       {dashTab === "ratings" && <RatingsPanel />}
+      {dashTab === "deletedOperators" && <DeletedOperatorsPanel />}
     </div>
   );
 }
@@ -804,6 +810,59 @@ function RatingsPanel() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function DeletedOperatorsPanel() {
+  const [deleted, setDeleted] = useState<Record<string, unknown>[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const snap = await getDocs(query(collection(db, "deleted_operators"), orderBy("deletedAt", "desc"), limit(50)));
+      setDeleted(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) return <LoadingSpinner />;
+
+  return (
+    <div className="space-y-3">
+      {deleted.length === 0 ? <EmptyState text="No deleted operator accounts" /> : deleted.map((op) => (
+        <div key={op.id as string} className="rounded-xl border border-dash-border bg-dash-bg p-5">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-white">
+                {op.firstName as string} {op.lastName as string}
+              </p>
+              <p className="text-xs text-white/40">{op.email as string}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {!!op.authDeleted && (
+                <span className="rounded-full bg-status-rejected/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-status-rejected">
+                  Auth Deleted
+                </span>
+              )}
+              {!!op.freeAccess && (
+                <span className="rounded-full bg-teal/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal">
+                  Free
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <InfoRow label="Phone" value={(op.phone as string) || "—"} />
+            <InfoRow label="Courts" value={
+              (op.courtIds as string[])?.length
+                ? (op.courtIds as string[]).join(", ")
+                : "None"
+            } />
+            <InfoRow label="Deleted" value={formatTs(op.deletedAt)} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

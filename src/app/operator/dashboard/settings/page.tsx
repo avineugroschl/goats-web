@@ -17,6 +17,7 @@ export default function OperatorSettings() {
 
   const isSubscribed = profile?.subscriptionStatus === "active";
   const isCancelling = profile?.subscriptionStatus === "cancelling";
+  const isFreeAccess = !!profile?.freeAccess;
   const hasAccess = isSubscribed || isCancelling;
 
   async function handleManageBilling() {
@@ -127,7 +128,7 @@ export default function OperatorSettings() {
           This permanently deletes your operator account. Your player account on the app (if existent) is not affected.
         </p>
 
-        {isSubscribed && !isCancelling ? (
+        {isSubscribed && !isCancelling && !isFreeAccess ? (
           <p className="text-sm text-status-rejected/70">
             You must cancel your subscription before you can delete your account.
             Use the Manage Billing button above to cancel first.

@@ -157,4 +157,5 @@ export interface OperatorProfile {
   subscriptionStatus?: "active" | "past_due" | "cancelled" | "cancelling" | "none";
   subscriptionExpiresAt?: string;
   applicationStatus?: "pending" | "approved" | "rejected";
+  freeAccess?: boolean;
 }

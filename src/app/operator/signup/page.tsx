@@ -9,6 +9,7 @@ import {
   setDoc,
   addDoc,
   collection,
+  getDoc,
   getDocs,
   query,
   where,
@@ -19,6 +20,12 @@ import { auth, db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { Court } from "@/lib/types";
 import { uploadCourtMainPhoto } from "@/lib/processImage";
+import {
+  isValidEmailSyntax,
+  isDisposableEmail,
+  getEmailSuggestion,
+  checkMxRecord,
+} from "@/lib/email-validation";
 
 type Step = "account" | "court" | "review";
 type CourtType = "new_court" | "claim_existing";
@@ -54,6 +61,7 @@ export default function OperatorSignup() {
   const [step, setStep] = useState<Step>("account");
   const [courtType, setCourtType] = useState<CourtType>("new_court");
   const [error, setError] = useState("");
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
 
   // Redirect if already signed in as an operator
   useEffect(() => {
@@ -140,9 +148,38 @@ export default function OperatorSignup() {
     if (!account.firstName.trim()) { setError("First name is required."); return false; }
     if (!account.lastName.trim()) { setError("Last name is required."); return false; }
     if (!account.email.trim()) { setError("Email is required."); return false; }
+
+    // 1. Syntax validation
+    if (!isValidEmailSyntax(account.email)) {
+      setError("Please enter a valid email address.");
+      return false;
+    }
+
+    // 2. Disposable email check
+    if (isDisposableEmail(account.email)) {
+      setError("Disposable email addresses are not allowed. Please use a real email.");
+      return false;
+    }
+
+    // 3. Mailcheck typo suggestion (non-blocking — user dismissed it, so proceed)
+    const suggestion = getEmailSuggestion(account.email);
+    if (suggestion && emailSuggestion !== suggestion.full) {
+      // First time seeing this suggestion — show it, don't block
+      setEmailSuggestion(suggestion.full);
+      setError("");
+      return false;
+    }
+
     if (!account.phone.trim()) { setError("Phone number is required."); return false; }
     if (account.password.length < 6) { setError("Password must be at least 6 characters."); return false; }
     if (account.password !== account.confirmPassword) { setError("Passwords don't match."); return false; }
+
+    // 4. MX record check
+    const mxValid = await checkMxRecord(account.email);
+    if (!mxValid) {
+      setError("This email domain doesn't appear to exist. Please check your email address.");
+      return false;
+    }
 
     // Check if an operator account with this email already exists
     try {
@@ -172,7 +209,7 @@ export default function OperatorSignup() {
             await signInWithEmailAndPassword(auth, account.email, account.password);
             // Password correct — user is now signed in
           } catch {
-            setError("This email already has a G.O.A.T.S account but the password doesn't match. Use your existing password.");
+            setError("This email already has a G.O.A.T.S account. If you signed up with Google or Apple, use \"Forgot Password\" in the app to set a password first. Otherwise, make sure you're using your existing password.");
             return false;
           }
         } else if (code === "auth/invalid-email") {
@@ -244,7 +281,7 @@ export default function OperatorSignup() {
             } catch (signInErr: unknown) {
               const signInCode = (signInErr as { code?: string })?.code;
               if (signInCode === "auth/wrong-password" || signInCode === "auth/invalid-credential") {
-                setError("This email already has an account but the password doesn't match. Use your existing password.");
+                setError("This email already has a G.O.A.T.S account. If you signed up with Google or Apple, use \"Forgot Password\" in the app to set a password first. Otherwise, make sure you're using your existing password.");
               } else {
                 setError("Something went wrong. Please try again.");
               }
@@ -293,6 +330,48 @@ export default function OperatorSignup() {
         applicationStatus: "pending",
         createdAt: serverTimestamp(),
       });
+
+      // Create a user doc if one doesn't already exist, so the operator
+      // can also sign in on the mobile apps (which require a users/{uid} doc).
+      const userDocRef = doc(db, "users", uid!);
+      const userDocSnap = await getDoc(userDocRef);
+      if (!userDocSnap.exists()) {
+        // Generate a unique username from the operator's name
+        let username = account.firstName.trim() || account.email.split("@")[0];
+        const usernameQuery = query(
+          collection(db, "users"),
+          where("username", "==", username),
+          limit(1)
+        );
+        const usernameSnap = await getDocs(usernameQuery);
+        if (!usernameSnap.empty) {
+          username = `${username}${uid!.slice(0, 4)}`;
+        }
+
+        await setDoc(userDocRef, {
+          id: uid,
+          email: account.email || user?.email || "",
+          username,
+          photoUrl: "",
+          profileBlurb: "",
+          selfRatingIq: 0,
+          selfRatingPassing: 0,
+          selfRatingDefense: 0,
+          selfRatingRebounding: 0,
+          selfRatingScoringInside: 0,
+          selfRatingMidRange: 0,
+          selfRatingThreePoint: 0,
+          selfRatingOffTheDribble: 0,
+          selfRatingSportsmanship: 0,
+          selfRatingCount: 0,
+          generalRating: 0,
+          ratingsCount: 0,
+          ratingsSum: 0,
+          autoCheckInDisabled: false,
+          isAdmin: false,
+          isAnonymous: false,
+        });
+      }
 
       // Create operator application for admin review
       const applicationData: Record<string, unknown> = {
@@ -414,13 +493,30 @@ export default function OperatorSignup() {
                   />
                 </div>
 
-                <InputField
-                  label="Email *"
-                  type="email"
-                  value={account.email}
-                  onChange={(v) => setAccount({ ...account, email: v })}
-                  placeholder="you@example.com"
-                />
+                <div>
+                  <InputField
+                    label="Email *"
+                    type="email"
+                    value={account.email}
+                    onChange={(v) => {
+                      setAccount({ ...account, email: v });
+                      setEmailSuggestion(null);
+                    }}
+                    placeholder="you@example.com"
+                  />
+                  {emailSuggestion && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccount({ ...account, email: emailSuggestion });
+                        setEmailSuggestion(null);
+                      }}
+                      className="mt-1.5 text-sm text-teal hover:text-teal-dark transition-colors"
+                    >
+                      Did you mean <span className="font-semibold">{emailSuggestion}</span>?
+                    </button>
+                  )}
+                </div>
 
                 <InputField
                   label="Phone Number *"
@@ -698,20 +794,35 @@ export default function OperatorSignup() {
                     ) : filteredCourts.length === 0 ? (
                       <p className="py-8 text-center text-sm text-white/30">No courts found</p>
                     ) : (
-                      filteredCourts.map((court) => (
-                        <button
-                          key={court.id}
-                          onClick={() => setSelectedCourtId(court.id)}
-                          className={`w-full rounded-lg p-3 text-left transition-all ${
-                            selectedCourtId === court.id
-                              ? "border border-teal bg-teal/10"
-                              : "border border-transparent hover:bg-dash-surface-hover"
-                          }`}
-                        >
-                          <p className="text-sm font-medium text-white">{court.name}</p>
-                          <p className="text-xs text-white/40">{court.address}</p>
-                        </button>
-                      ))
+                      filteredCourts.map((court) => {
+                        const hasClaimed = (court.operatorIds?.length ?? 0) > 0;
+                        return (
+                          <button
+                            key={court.id}
+                            onClick={() => !hasClaimed && setSelectedCourtId(court.id)}
+                            disabled={hasClaimed}
+                            className={`w-full rounded-lg p-3 text-left transition-all ${
+                              hasClaimed
+                                ? "cursor-not-allowed border border-transparent opacity-40"
+                                : selectedCourtId === court.id
+                                  ? "border border-teal bg-teal/10"
+                                  : "border border-transparent hover:bg-dash-surface-hover"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-white">{court.name}</p>
+                                <p className="text-xs text-white/40">{court.address}</p>
+                              </div>
+                              {hasClaimed && (
+                                <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/30">
+                                  Claimed
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
                     )}
                   </div>
 
