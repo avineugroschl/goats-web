@@ -51,16 +51,16 @@ export default function Home() {
             G.O.A.T.S
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href="/courts"
-            className="rounded-full bg-coral px-6 py-2.5 text-center font-display text-sm font-bold text-white shadow-lg shadow-coral/25 transition-all hover:scale-[1.02] hover:bg-coral-dark hover:shadow-coral/35"
+            className="rounded-full bg-coral px-3 py-2 text-center font-display text-xs font-bold text-white shadow-lg shadow-coral/25 transition-all hover:scale-[1.02] hover:bg-coral-dark hover:shadow-coral/35 sm:px-6 sm:py-2.5 sm:text-sm"
           >
             Browse Courts
           </Link>
           <Link
             href="/operator"
-            className="rounded-full border-2 border-text-primary/15 px-6 py-2.5 text-center font-display text-sm font-bold text-text-primary transition-all hover:border-teal hover:text-teal"
+            className="rounded-full border-2 border-text-primary/15 px-3 py-2 text-center font-display text-xs font-bold text-text-primary transition-all hover:border-teal hover:text-teal sm:px-6 sm:py-2.5 sm:text-sm"
           >
             Court Operators
           </Link>

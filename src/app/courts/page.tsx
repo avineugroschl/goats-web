@@ -253,7 +253,7 @@ export default function CourtsPage() {
       />
 
       {/* Location & Filters */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      <div className="mb-6 flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <span className="text-sm text-text-muted">Results for:</span>
           <button
@@ -288,6 +288,7 @@ export default function CourtsPage() {
             </button>
           )}
         </div>
+        <div className="flex items-center gap-3">
         <select
           value={filterSetting}
           onChange={(e) => setFilterSetting(e.target.value)}
@@ -329,6 +330,7 @@ export default function CourtsPage() {
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
 
@@ -443,7 +445,7 @@ function CourtCard({
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <h2 className="truncate text-base font-bold">{court.name}</h2>
         <p className="truncate text-sm text-teal">{court.address}</p>
-        <div className="mt-1 flex items-center gap-3 text-sm">
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0 text-xs sm:text-sm">
           <span className="text-text-secondary">
             {court.baskets} basket{court.baskets !== 1 ? "s" : ""}
           </span>
