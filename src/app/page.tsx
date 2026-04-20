@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Footer from "@/components/Footer";
+import { APP_CONFIG, getDeviceType, buildStoreUrl } from "@/lib/app-config";
 
 /* ── Modern phone frame with realistic bezel + dynamic island ── */
 function PhoneFrame({
@@ -33,21 +34,63 @@ function PhoneFrame({
 
 export default function Home() {
   const [visible, setVisible] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
+
   useEffect(() => {
     setVisible(true);
   }, []);
+
+  // Close modals on Escape
+  useEffect(() => {
+    if (!showQrModal && !showComingSoon) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowQrModal(false);
+        setShowComingSoon(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showQrModal, showComingSoon]);
+
+  function handleAppStoreBadge() {
+    if (getDeviceType() === "desktop") {
+      setShowQrModal(true);
+    } else {
+      window.location.href = buildStoreUrl(APP_CONFIG.appStoreUrl, {
+        utm_source: "website",
+        utm_medium: "badge",
+      });
+    }
+  }
+
+  function handleGooglePlayBadge() {
+    if (!APP_CONFIG.playStoreAvailable) {
+      setShowComingSoon(true);
+      return;
+    }
+    if (getDeviceType() === "desktop") {
+      setShowQrModal(true);
+    } else if (APP_CONFIG.playStoreUrl) {
+      window.location.href = buildStoreUrl(APP_CONFIG.playStoreUrl, {
+        utm_source: "website",
+        utm_medium: "badge",
+      });
+    }
+  }
 
   return (
     <main className="min-h-screen overflow-hidden bg-bg">
       {/* ─── Nav — light, always shows Court Operators ─── */}
       <nav className="relative z-30 flex items-center justify-between border-b border-black/[0.04] bg-white/80 px-6 py-4 backdrop-blur-lg sm:px-12">
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           <img
             src="/app-icon.png"
             alt="G.O.A.T.S"
             className="h-10 w-10 rounded-xl"
           />
-          <span className="font-display text-xl font-bold tracking-tight text-text-primary">
+          <span className="hidden font-display text-xl font-bold tracking-tight text-text-primary sm:block">
             G.O.A.T.S
           </span>
         </div>
@@ -100,12 +143,28 @@ export default function Home() {
 
             {/* App store badges */}
             <div id="app-badges" className="scroll-mt-32 flex flex-col items-center gap-2.5 sm:flex-row lg:justify-start">
-              <span className="rounded-xl bg-surface-dark/[0.06] px-5 py-2.5 text-sm font-semibold text-text-muted">
-                App Store &mdash; Coming Soon
-              </span>
-              <span className="rounded-xl bg-surface-dark/[0.06] px-5 py-2.5 text-sm font-semibold text-text-muted">
-                Google Play &mdash; Coming Soon
-              </span>
+              <button
+                onClick={handleAppStoreBadge}
+                className="transition-all hover:opacity-80 active:scale-[0.98]"
+              >
+                <img
+                  src="/badge-app-store.svg"
+                  alt="Download on the App Store"
+                  className="h-[54px]"
+                  draggable={false}
+                />
+              </button>
+              <button
+                onClick={handleGooglePlayBadge}
+                className="transition-all hover:opacity-80 active:scale-[0.98]"
+              >
+                <img
+                  src="/badge-google-play.svg"
+                  alt="Get it on Google Play"
+                  className="h-[54px]"
+                  draggable={false}
+                />
+              </button>
             </div>
           </div>
 
@@ -236,6 +295,69 @@ export default function Home() {
       </section>
 
       <Footer />
+
+      {/* QR Code Modal — desktop badge click */}
+      {showQrModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowQrModal(false)}
+        >
+          <div
+            className="relative mx-4 max-w-xs rounded-2xl bg-surface-dark p-8 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowQrModal(false)}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src="/qr-download.png"
+              alt="QR code to download G.O.A.T.S"
+              className="mx-auto mb-5 h-48 w-48 rounded-xl"
+            />
+            <p className="text-sm text-white/60">
+              Scan with your phone camera to download
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Coming Soon Modal — Google Play pre-launch */}
+      {showComingSoon && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowComingSoon(false)}
+        >
+          <div
+            className="relative mx-4 max-w-xs rounded-2xl bg-surface-dark p-8 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowComingSoon(false)}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src="/app-icon.png"
+              alt="G.O.A.T.S"
+              className="mx-auto mb-4 h-16 w-16 rounded-xl"
+            />
+            <h3 className="font-display mb-2 text-lg font-bold text-white">
+              Coming Soon to Android
+            </h3>
+            <p className="text-sm text-white/50">
+              G.O.A.T.S is currently available on iOS. Android is on the way.
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
