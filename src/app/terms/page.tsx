@@ -17,7 +17,7 @@ export default function TermsOfService() {
 
       <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
         <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Terms of Service</h1>
-        <p className="mb-12 text-sm text-white/30">Last updated: April 10, 2026</p>
+        <p className="mb-12 text-sm text-white/30">Last updated: April 24, 2026</p>
 
         <div className="space-y-10 text-sm leading-relaxed text-white/60">
           <Section title="1. Acceptance of Terms">
@@ -110,33 +110,53 @@ export default function TermsOfService() {
             </p>
           </Section>
 
-          <Section title="11. Limitation of Liability">
+          <Section title="11. In-Person Activity and Assumption of Risk">
+            <p className="mb-3">
+              The Service facilitates coordination for in-person basketball at public courts. We do not organize,
+              supervise, control, or participate in any in-person interaction between users. You acknowledge and agree that:
+            </p>
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>Attending basketball courts and playing basketball involves inherent risks, including physical injury, altercations or conflicts with other users, theft, property damage, and exposure to hazardous court conditions.</li>
+              <li>We do not verify the identity, background, character, or skill level of any user.</li>
+              <li>We do not inspect, maintain, or verify the safety or condition of any court listed in the Service.</li>
+              <li>Information about courts (including check-in counts, operator announcements, and user-submitted content) may be inaccurate, outdated, or misleading.</li>
+              <li>You assume all risk associated with in-person use of courts identified through the Service and with any interaction with other users.</li>
+              <li>You are solely responsible for your safety, your personal property, and your conduct when meeting or playing with other users.</li>
+            </ul>
+            <p className="mt-3">
+              To the fullest extent permitted by law, we are not responsible for any injury, loss, damage, dispute,
+              or harm arising from in-person interactions between users, from the condition of any court, or from your
+              decision to visit any location identified through the Service.
+            </p>
+          </Section>
+
+          <Section title="12. Limitation of Liability">
             <p>
               To the maximum extent permitted by law, G.O.A.T.S shall not be liable for any indirect, incidental,
               special, or consequential damages arising from your use of the Service.
             </p>
           </Section>
 
-          <Section title="12. Governing Law">
+          <Section title="13. Governing Law">
             <p>
               These Terms are governed by and construed in accordance with the laws of the State of New York,
               without regard to its conflict of law provisions.
             </p>
           </Section>
 
-          <Section title="13. Changes to Terms">
+          <Section title="14. Changes to Terms">
             <p>
               We may update these Terms from time to time. Continued use of the Service after changes constitutes
               acceptance of the updated terms. We will notify users of significant changes through the app or by email.
             </p>
           </Section>
 
-          <Section title="14. Contact">
+          <Section title="15. Contact">
             <p>
               Questions about these Terms? Contact us at{" "}
               <a href="mailto:office@goatssportsapp.com" className="text-teal hover:underline">office@goatssportsapp.com</a>
               {" "}or{" "}
-              <a href="tel:8457467745" className="text-teal hover:underline">(845) 746-7745</a>.
+              <a href="tel:8459250433" className="text-teal hover:underline">(845) 925-0433</a>.
             </p>
           </Section>
         </div>

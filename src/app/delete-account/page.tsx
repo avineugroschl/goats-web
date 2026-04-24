@@ -61,7 +61,7 @@ export default function DeleteAccount() {
             <p className="mt-3">
               <a href="mailto:office@goatssportsapp.com" className="font-medium text-teal hover:underline">office@goatssportsapp.com</a>
               <span className="mx-2 text-white/20">|</span>
-              <a href="tel:8457467745" className="font-medium text-teal hover:underline">(845) 746-7745</a>
+              <a href="tel:8459250433" className="font-medium text-teal hover:underline">(845) 925-0433</a>
             </p>
           </div>
         </div>

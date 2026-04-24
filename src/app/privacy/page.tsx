@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
 
       <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
         <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Privacy Policy</h1>
-        <p className="mb-12 text-sm text-white/30">Last updated: April 10, 2026</p>
+        <p className="mb-12 text-sm text-white/30">Last updated: April 24, 2026</p>
 
         <div className="space-y-10 text-sm leading-relaxed text-white/60">
           <Section title="1. Introduction">
@@ -32,7 +32,7 @@ export default function PrivacyPolicy() {
             <p className="mb-3 font-medium text-white/80">For Players:</p>
             <ul className="mb-4 list-disc space-y-1.5 pl-5">
               <li><span className="text-white/80">Account Information:</span> Email address, username, and profile photo you provide when creating an account.</li>
-              <li><span className="text-white/80">Location Data:</span> Your device&apos;s location to check you in and out of basketball courts, show nearby courts, and calculate distances. Location may be collected in the background if you grant &quot;Always&quot; permission, solely for automatic court check-in/check-out via geofencing.</li>
+              <li><span className="text-white/80">Location Data:</span> Your device&apos;s location to check you in and out of basketball courts, show nearby courts, and calculate distances. Location may be collected in the background if you grant &quot;Always&quot; permission, solely for automatic court check-in/check-out via geofencing. If you grant &quot;Always&quot; location permission, the app collects your location in the background solely to automatically check you in and out of basketball courts via geofencing. This background location data is not used for advertising, is not sold to third parties, and is not used for any purpose other than check-in functionality. You can revoke this permission at any time in your device settings, and the app will continue to function with reduced features.</li>
               <li><span className="text-white/80">Ratings and Activity:</span> Basketball skill ratings you give and receive, court visit history, and chat messages posted at courts.</li>
               <li><span className="text-white/80">Device Information:</span> Firebase Cloud Messaging tokens for delivering push notifications.</li>
               <li><span className="text-white/80">Court Follow Preferences:</span> Which courts you follow to receive operator notifications.</li>
@@ -97,7 +97,7 @@ export default function PrivacyPolicy() {
               If you have questions about this Privacy Policy, contact us at{" "}
               <a href="mailto:office@goatssportsapp.com" className="text-teal hover:underline">office@goatssportsapp.com</a>
               {" "}or{" "}
-              <a href="tel:8457467745" className="text-teal hover:underline">(845) 746-7745</a>.
+              <a href="tel:8459250433" className="text-teal hover:underline">(845) 925-0433</a>.
             </p>
           </Section>
         </div>
