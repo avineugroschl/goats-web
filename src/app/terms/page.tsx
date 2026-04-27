@@ -17,13 +17,16 @@ export default function TermsOfService() {
 
       <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
         <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Terms of Service</h1>
-        <p className="mb-12 text-sm text-white/30">Last updated: April 24, 2026</p>
+        <p className="mb-12 text-sm text-white/30">Last updated: April 27, 2026</p>
 
         <div className="space-y-10 text-sm leading-relaxed text-white/60">
           <Section title="1. Acceptance of Terms">
             <p>
-              By accessing or using the G.O.A.T.S mobile application or website (collectively, the &quot;Service&quot;),
-              you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the Service.
+              These Terms of Service (&quot;Terms&quot;) are a binding agreement between you and Eclipsis L.L.C.
+              (&quot;Eclipsis,&quot; &quot;G.O.A.T.S,&quot; &quot;we,&quot; &quot;our,&quot; &quot;us&quot;), the operator
+              of the G.O.A.T.S mobile application and the website at goatssportsapp.com (collectively, the &quot;Service&quot;).
+              By accessing or using the Service, you agree to be bound by these Terms. If you do not agree to these Terms,
+              do not use the Service.
             </p>
           </Section>
 
@@ -79,7 +82,7 @@ export default function TermsOfService() {
           <Section title="7. Content and Intellectual Property">
             <p>
               You retain ownership of content you submit (photos, comments, chat messages). By posting content to the
-              Service, you grant G.O.A.T.S a non-exclusive, royalty-free license to display that content within the
+              Service, you grant Eclipsis a non-exclusive, royalty-free license to display that content within the
               Service. You represent that you have the right to share any content you upload. We may remove content
               that violates these terms without notice. If you believe content on the Service infringes your copyright,
               contact us at office@goatssportsapp.com and we will promptly review and remove infringing material.
@@ -132,7 +135,7 @@ export default function TermsOfService() {
 
           <Section title="12. Limitation of Liability">
             <p>
-              To the maximum extent permitted by law, G.O.A.T.S shall not be liable for any indirect, incidental,
+              To the maximum extent permitted by law, Eclipsis L.L.C. shall not be liable for any indirect, incidental,
               special, or consequential damages arising from your use of the Service.
             </p>
           </Section>
@@ -158,6 +161,7 @@ export default function TermsOfService() {
               {" "}or{" "}
               <a href="tel:8459250433" className="text-teal hover:underline">(845) 925-0433</a>.
             </p>
+            <p className="mt-3 font-medium text-white/80">Eclipsis L.L.C.</p>
           </Section>
         </div>
       </article>

@@ -17,14 +17,13 @@ export default function PrivacyPolicy() {
 
       <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
         <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Privacy Policy</h1>
-        <p className="mb-12 text-sm text-white/30">Last updated: April 24, 2026</p>
+        <p className="mb-12 text-sm text-white/30">Last updated: April 27, 2026</p>
 
         <div className="space-y-10 text-sm leading-relaxed text-white/60">
           <Section title="1. Introduction">
             <p>
-              G.O.A.T.S (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) operates the G.O.A.T.S mobile application
-              and the website at goatssportsapp.com. This Privacy Policy explains how we collect, use, and protect
-              your information when you use our services.
+              G.O.A.T.S is operated by Eclipsis L.L.C. (&quot;Eclipsis,&quot; &quot;we,&quot; &quot;our,&quot; &quot;us&quot;). This Privacy Policy explains how we collect, use, and protect
+              your information when you use the G.O.A.T.S mobile application and the website at goatssportsapp.com.
             </p>
           </Section>
 
@@ -99,6 +98,7 @@ export default function PrivacyPolicy() {
               {" "}or{" "}
               <a href="tel:8459250433" className="text-teal hover:underline">(845) 925-0433</a>.
             </p>
+            <p className="mt-3 font-medium text-white/80">Eclipsis L.L.C.</p>
           </Section>
         </div>
       </article>

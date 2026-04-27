@@ -33,7 +33,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 pt-6 border-t border-white/[0.05] text-center text-xs text-white/20">
-          &copy; {new Date().getFullYear()} G.O.A.T.S. All rights reserved.
+          &copy; 2026 Eclipsis... All rights reserved.
         </div>
       </div>
     </footer>
