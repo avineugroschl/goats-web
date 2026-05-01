@@ -1,7 +1,7 @@
 export const APP_CONFIG = {
   appStoreUrl: 'https://apps.apple.com/app/g-o-a-t-s/id6758734122',
-  playStoreUrl: null as string | null, // TODO: set when Android launches
-  playStoreAvailable: false, // flip to true on Android launch
+  playStoreUrl: 'https://play.google.com/store/apps/details?id=com.goats.app',
+  playStoreAvailable: true,
   smartLinkUrl: 'https://goatssportsapp.com/download',
   homeUrl: 'https://goatssportsapp.com/',
 };
