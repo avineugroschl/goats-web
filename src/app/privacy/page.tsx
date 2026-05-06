@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
 
       <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
         <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Privacy Policy</h1>
-        <p className="mb-12 text-sm text-white/30">Last updated: April 27, 2026</p>
+        <p className="mb-12 text-sm text-white/30">Last updated: May 6, 2026</p>
 
         <div className="space-y-10 text-sm leading-relaxed text-white/60">
           <Section title="1. Introduction">
@@ -35,6 +35,7 @@ export default function PrivacyPolicy() {
               <li><span className="text-white/80">Ratings and Activity:</span> Basketball skill ratings you give and receive, court visit history, and chat messages posted at courts.</li>
               <li><span className="text-white/80">Device Information:</span> Firebase Cloud Messaging tokens for delivering push notifications.</li>
               <li><span className="text-white/80">Court Follow Preferences:</span> Which courts you follow to receive operator notifications.</li>
+              <li><span className="text-white/80">Reports and Moderation Data:</span> When you report content or block another user, we collect the report details (the content reported, the reason selected, and the timestamp) to enforce our Terms of Service. Reports and moderation records may be retained after the related content or account is removed, as needed for safety, legal compliance, and to prevent repeat violations.</li>
             </ul>
             <p className="mb-3 font-medium text-white/80">For Court Operators:</p>
             <ul className="list-disc space-y-1.5 pl-5">
@@ -52,6 +53,7 @@ export default function PrivacyPolicy() {
               <li>To deliver push notifications about court activity and operator announcements</li>
               <li>To process operator subscription payments via Stripe</li>
               <li>To enable court management features for operators</li>
+              <li>To moderate content, investigate reports, and enforce our Terms of Service, including reviewing chat messages, comments, photos, and other user-submitted content</li>
               <li>To maintain and improve our services</li>
             </ul>
           </Section>

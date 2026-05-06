@@ -17,7 +17,7 @@ export default function TermsOfService() {
 
       <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
         <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Terms of Service</h1>
-        <p className="mb-12 text-sm text-white/30">Last updated: April 27, 2026</p>
+        <p className="mb-12 text-sm text-white/30">Last updated: May 6, 2026</p>
 
         <div className="space-y-10 text-sm leading-relaxed text-white/60">
           <Section title="1. Acceptance of Terms">
@@ -48,6 +48,13 @@ export default function TermsOfService() {
           </Section>
 
           <Section title="4. Acceptable Use">
+            <p className="mb-3">
+              We have zero tolerance for objectionable content or abusive users on the Service. Objectionable content
+              includes but is not limited to content that is harassing, threatening, hateful, discriminatory, sexually
+              explicit, violent, illegal, or otherwise inappropriate. Users who post objectionable content or engage in
+              abusive behavior toward other users will have the offending content removed and may be permanently removed
+              from the Service.
+            </p>
             <p className="mb-3">You agree not to:</p>
             <ul className="list-disc space-y-1.5 pl-5">
               <li>Submit false or misleading ratings of other players</li>
@@ -105,7 +112,16 @@ export default function TermsOfService() {
             </p>
           </Section>
 
-          <Section title="10. Disclaimers">
+          <Section title="10. Content Moderation and Reporting">
+            <p>
+              We provide tools within the Service to report objectionable content and to block abusive users. Reports
+              of objectionable content or abusive behavior will be reviewed and acted upon within 24 hours, including
+              removal of the content and, where appropriate, ejection of the user responsible. Blocking another user
+              immediately removes their content from your view within the Service.
+            </p>
+          </Section>
+
+          <Section title="11. Disclaimers">
             <p>
               The Service is provided &quot;as is&quot; without warranties of any kind. We do not guarantee the
               accuracy of court information, player ratings, or real-time check-in data. We are not responsible for
@@ -113,7 +129,7 @@ export default function TermsOfService() {
             </p>
           </Section>
 
-          <Section title="11. In-Person Activity and Assumption of Risk">
+          <Section title="12. In-Person Activity and Assumption of Risk">
             <p className="mb-3">
               The Service facilitates coordination for in-person basketball at public courts. We do not organize,
               supervise, control, or participate in any in-person interaction between users. You acknowledge and agree that:
@@ -133,28 +149,28 @@ export default function TermsOfService() {
             </p>
           </Section>
 
-          <Section title="12. Limitation of Liability">
+          <Section title="13. Limitation of Liability">
             <p>
               To the maximum extent permitted by law, Eclipsis L.L.C. shall not be liable for any indirect, incidental,
               special, or consequential damages arising from your use of the Service.
             </p>
           </Section>
 
-          <Section title="13. Governing Law">
+          <Section title="14. Governing Law">
             <p>
               These Terms are governed by and construed in accordance with the laws of the State of New York,
               without regard to its conflict of law provisions.
             </p>
           </Section>
 
-          <Section title="14. Changes to Terms">
+          <Section title="15. Changes to Terms">
             <p>
               We may update these Terms from time to time. Continued use of the Service after changes constitutes
               acceptance of the updated terms. We will notify users of significant changes through the app or by email.
             </p>
           </Section>
 
-          <Section title="15. Contact">
+          <Section title="16. Contact">
             <p>
               Questions about these Terms? Contact us at{" "}
               <a href="mailto:office@goatssportsapp.com" className="text-teal hover:underline">office@goatssportsapp.com</a>
