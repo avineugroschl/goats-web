@@ -264,6 +264,7 @@ export default function CourtManagement() {
         updates.promo = {
           active: promoActive,
           text: promoText.trim(),
+          updatedAt: serverTimestamp(),
         };
       }
 
@@ -316,7 +317,7 @@ export default function CourtManagement() {
         scheduleEnabled,
         scheduleOverrides,
         operatorBanner: bannerData,
-        promo: { active: promoActive, text: promoText.trim() },
+        promo: { active: promoActive, text: promoText.trim(), updatedAt: serverTimestamp() },
         published: true,
       });
       await loadCourt(courtId);

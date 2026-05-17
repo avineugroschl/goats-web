@@ -55,6 +55,7 @@ export interface ScheduleOverride {
 export interface CourtPromo {
   active: boolean;
   text: string;
+  updatedAt?: unknown;
   expiresAt?: unknown;
 }
 
