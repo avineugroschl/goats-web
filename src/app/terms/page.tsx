@@ -17,7 +17,7 @@ export default function TermsOfService() {
 
       <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
         <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Terms of Service</h1>
-        <p className="mb-12 text-sm text-white/30">Last updated: May 6, 2026</p>
+        <p className="mb-12 text-sm text-white/30">Last updated: May 19, 2026</p>
 
         <div className="space-y-10 text-sm leading-relaxed text-white/60">
           <Section title="1. Acceptance of Terms">
@@ -35,6 +35,7 @@ export default function TermsOfService() {
               G.O.A.T.S is a basketball court discovery and community platform. The Service allows users to find
               courts, check in to courts, rate other players, and communicate with the basketball community. Court
               operators may use the Service to manage their courts, publish announcements, and communicate with players.
+              Players may optionally subscribe to Golden G.O.A.T. to unlock additional in-app features.
             </p>
           </Section>
 
@@ -97,14 +98,75 @@ export default function TermsOfService() {
           </Section>
 
           <Section title="8. Payments and Refunds">
+            <p className="mb-3">The Service offers two types of paid subscriptions:</p>
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>
+                <strong className="font-semibold text-white/80">Court Operator subscriptions</strong> are processed by Stripe
+                through our website. By subscribing as a court operator, you agree to Stripe&apos;s terms of service.
+                Operator subscription fees are non-refundable for partial billing periods. If you cancel, you retain
+                access until the end of your current billing period.
+              </li>
+              <li>
+                <strong className="font-semibold text-white/80">Golden G.O.A.T. player subscriptions</strong> are processed
+                by Apple through the App Store or by Google through Google Play. These subscriptions are governed by
+                Section 9 below and by the applicable platform&apos;s terms.
+              </li>
+            </ul>
+          </Section>
+
+          <Section title="9. Golden G.O.A.T. Subscription">
+            <p className="mb-3">
+              Golden G.O.A.T. is an auto-renewable subscription that unlocks premium features within the G.O.A.T.S
+              mobile application, including expanded saved courts, access to rating history, access to court busyness
+              history charts, a golden border on your profile avatar, and additional weight on your ratings of other
+              players.
+            </p>
+            <p className="mb-2">
+              <strong className="font-semibold text-white/80">Pricing.</strong> Golden G.O.A.T. is offered at the following
+              prices (subject to change):
+            </p>
+            <ul className="mb-3 list-disc space-y-1.5 pl-5">
+              <li>Monthly: $4.99 per month</li>
+              <li>Yearly: $14.99 per year</li>
+            </ul>
+            <p className="mb-3">
+              Prices in regions outside the United States may differ based on local pricing tiers set by Apple or
+              Google and may include applicable taxes.
+            </p>
+            <p className="mb-3">
+              <strong className="font-semibold text-white/80">Payment and Auto-Renewal.</strong> Payment will be charged to
+              your Apple ID account (iOS) or Google Play account (Android) at confirmation of purchase. The subscription
+              automatically renews unless auto-renew is turned off before the end of the current period. You can manage
+              your subscription and turn off auto-renewal through your Apple ID account settings (iOS) or Google Play
+              account settings (Android) after purchase.
+            </p>
+            <p className="mb-3">
+              <strong className="font-semibold text-white/80">Cancellation.</strong> You may cancel your subscription at any
+              time through your Apple ID or Google Play account settings. You will retain access to premium features
+              through the end of the period you have already paid for. Deleting the G.O.A.T.S app does not cancel your
+              subscription.
+            </p>
+            <p className="mb-3">
+              <strong className="font-semibold text-white/80">Refunds.</strong> All purchases are processed by Apple (iOS)
+              or Google (Android) and are subject to their respective refund policies. Eclipsis L.L.C. does not process
+              refunds for in-app purchases directly. To request a refund on iOS, contact Apple Support through your
+              Apple ID account. To request a refund on Android, contact Google Play Support through your Google Play
+              account.
+            </p>
+            <p className="mb-3">
+              <strong className="font-semibold text-white/80">Free Trials and Promotions.</strong> Where offered, any free
+              trial or promotional period will automatically convert to a paid subscription at the end of the trial
+              unless you cancel before the trial ends. Only one free trial per subscription group is permitted per
+              account.
+            </p>
             <p>
-              Operator subscriptions are processed by Stripe. By subscribing, you agree to Stripe&apos;s terms of
-              service. Subscription fees are non-refundable for partial billing periods. If you cancel, you retain
-              access until the end of your current billing period.
+              <strong className="font-semibold text-white/80">Loss of Access.</strong> If your payment method fails or your
+              subscription lapses, premium features will become inaccessible until payment is restored. Your account
+              and non-premium features remain available.
             </p>
           </Section>
 
-          <Section title="9. Termination">
+          <Section title="10. Termination">
             <p>
               We reserve the right to suspend or terminate accounts that violate these terms. You may delete your
               account at any time. See our <Link href="/delete-account" className="text-teal hover:underline">account deletion page</Link> for
@@ -112,7 +174,7 @@ export default function TermsOfService() {
             </p>
           </Section>
 
-          <Section title="10. Content Moderation and Reporting">
+          <Section title="11. Content Moderation and Reporting">
             <p>
               We provide tools within the Service to report objectionable content and to block abusive users. Reports
               of objectionable content or abusive behavior will be reviewed and acted upon within 24 hours, including
@@ -121,7 +183,7 @@ export default function TermsOfService() {
             </p>
           </Section>
 
-          <Section title="11. Disclaimers">
+          <Section title="12. Disclaimers">
             <p>
               The Service is provided &quot;as is&quot; without warranties of any kind. We do not guarantee the
               accuracy of court information, player ratings, or real-time check-in data. We are not responsible for
@@ -129,7 +191,7 @@ export default function TermsOfService() {
             </p>
           </Section>
 
-          <Section title="12. In-Person Activity and Assumption of Risk">
+          <Section title="13. In-Person Activity and Assumption of Risk">
             <p className="mb-3">
               The Service facilitates coordination for in-person basketball at public courts. We do not organize,
               supervise, control, or participate in any in-person interaction between users. You acknowledge and agree that:
@@ -149,28 +211,30 @@ export default function TermsOfService() {
             </p>
           </Section>
 
-          <Section title="13. Limitation of Liability">
+          <Section title="14. Limitation of Liability">
             <p>
               To the maximum extent permitted by law, Eclipsis L.L.C. shall not be liable for any indirect, incidental,
               special, or consequential damages arising from your use of the Service.
             </p>
           </Section>
 
-          <Section title="14. Governing Law">
+          <Section title="15. Governing Law">
             <p>
               These Terms are governed by and construed in accordance with the laws of the State of New York,
               without regard to its conflict of law provisions.
             </p>
           </Section>
 
-          <Section title="15. Changes to Terms">
+          <Section title="16. Changes to Terms">
             <p>
               We may update these Terms from time to time. Continued use of the Service after changes constitutes
               acceptance of the updated terms. We will notify users of significant changes through the app or by email.
+              Changes that materially affect existing Golden G.O.A.T. subscribers will be communicated in-app or by
+              email before taking effect.
             </p>
           </Section>
 
-          <Section title="16. Contact">
+          <Section title="17. Contact">
             <p>
               Questions about these Terms? Contact us at{" "}
               <a href="mailto:office@goatssportsapp.com" className="text-teal hover:underline">office@goatssportsapp.com</a>

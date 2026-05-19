@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
 
       <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
         <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Privacy Policy</h1>
-        <p className="mb-12 text-sm text-white/30">Last updated: May 6, 2026</p>
+        <p className="mb-12 text-sm text-white/30">Last updated: May 19, 2026</p>
 
         <div className="space-y-10 text-sm leading-relaxed text-white/60">
           <Section title="1. Introduction">
@@ -35,6 +35,7 @@ export default function PrivacyPolicy() {
               <li><span className="text-white/80">Ratings and Activity:</span> Basketball skill ratings you give and receive, court visit history, and chat messages posted at courts.</li>
               <li><span className="text-white/80">Device Information:</span> Firebase Cloud Messaging tokens for delivering push notifications.</li>
               <li><span className="text-white/80">Court Follow Preferences:</span> Which courts you follow to receive operator notifications.</li>
+              <li><span className="text-white/80">Subscription Status:</span> If you purchase a Golden G.O.A.T. subscription, we receive transaction information from Apple (and, where applicable, Google) sufficient to verify your subscription status and entitlement, including a transaction identifier, product identifier, purchase date, and expiration date. We do not receive or store your credit card number, Apple ID password, or full Apple ID. Payment processing is handled entirely by Apple or Google under their respective terms and privacy policies.</li>
               <li><span className="text-white/80">Reports and Moderation Data:</span> When you report content or block another user, we collect the report details (the content reported, the reason selected, and the timestamp) to enforce our Terms of Service. Reports and moderation records may be retained after the related content or account is removed, as needed for safety, legal compliance, and to prevent repeat violations.</li>
             </ul>
             <p className="mb-3 font-medium text-white/80">For Court Operators:</p>
@@ -52,6 +53,7 @@ export default function PrivacyPolicy() {
               <li>To enable the player rating system</li>
               <li>To deliver push notifications about court activity and operator announcements</li>
               <li>To process operator subscription payments via Stripe</li>
+              <li>To verify Golden G.O.A.T. subscription status and unlock premium features for subscribers</li>
               <li>To enable court management features for operators</li>
               <li>To moderate content, investigate reports, and enforce our Terms of Service, including reviewing chat messages, comments, photos, and other user-submitted content</li>
               <li>To maintain and improve our services</li>
@@ -62,8 +64,10 @@ export default function PrivacyPolicy() {
             <p>
               Your data is stored securely using Google Firebase (Firestore and Firebase Storage). We use
               industry-standard security measures including encrypted connections (HTTPS/TLS), Firebase Security
-              Rules, and secure authentication. Payment processing is handled entirely by Stripe using
-              PCI-compliant infrastructure.
+              Rules, and secure authentication. Payment processing for operator subscriptions is handled entirely
+              by Stripe using PCI-compliant infrastructure. Apple In-App Purchase transactions are processed
+              entirely by Apple, and Google Play subscription transactions are processed entirely by Google. We
+              do not store payment card information.
             </p>
           </Section>
 
@@ -72,7 +76,7 @@ export default function PrivacyPolicy() {
             <ul className="list-disc space-y-1.5 pl-5">
               <li><span className="text-white/80">Other users:</span> Your username, profile photo, and ratings are visible to other app users. You can enable Anonymous Mode to hide your identity at courts.</li>
               <li><span className="text-white/80">Court operators:</span> Operators can see aggregated check-in statistics and follower counts for their courts. They cannot see individual user identities unless the user is actively checked in (and not in Anonymous Mode).</li>
-              <li><span className="text-white/80">Service providers:</span> We use Google Firebase for data storage, authentication, and cloud functions. We use Stripe for payment processing.</li>
+              <li><span className="text-white/80">Service providers:</span> We use Google Firebase for data storage, authentication, and cloud functions. We use Stripe for operator payment processing. We use Apple&apos;s In-App Purchase system to process player subscriptions on iOS, and Google Play Billing on Android.</li>
             </ul>
           </Section>
 
@@ -81,6 +85,7 @@ export default function PrivacyPolicy() {
               <li><span className="text-white/80">Anonymous Mode:</span> Hide your identity from other users at courts.</li>
               <li><span className="text-white/80">Location Permission:</span> You can change location permissions at any time in your device settings. The app functions with reduced features without location access.</li>
               <li><span className="text-white/80">Notifications:</span> You can unfollow courts to stop receiving operator notifications. You can disable push notifications in your device settings.</li>
+              <li><span className="text-white/80">Subscription Management:</span> You can manage or cancel your Golden G.O.A.T. subscription at any time through your Apple ID account settings (iOS) or Google Play account settings (Android).</li>
               <li><span className="text-white/80">Account Deletion:</span> You may delete your account at any time. See our <Link href="/delete-account" className="text-teal hover:underline">account deletion page</Link> for instructions.</li>
             </ul>
           </Section>
