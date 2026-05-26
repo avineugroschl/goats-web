@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { useSelectedCourt } from "@/lib/selected-court";
 import { Court } from "@/lib/types";
 
 interface SentNotification {
@@ -31,7 +32,7 @@ const MAX_PER_DAY = 2;
 
 export default function NotificationsPage() {
   const { profile } = useAuth();
-  const courtId = profile?.operatorCourtIds?.[0];
+  const courtId = useSelectedCourt();
 
   const [court, setCourt] = useState<Court | null>(null);
   const [loading, setLoading] = useState(true);

@@ -25,7 +25,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { db } from "@/lib/firebase";
-import { useAuth } from "@/lib/auth-context";
+import { useSelectedCourt } from "@/lib/selected-court";
 import { Court } from "@/lib/types";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -53,8 +53,7 @@ const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function DashboardOverview() {
-  const { profile } = useAuth();
-  const courtId = profile?.operatorCourtIds?.[0];
+  const courtId = useSelectedCourt();
 
   const [court, setCourt] = useState<Court | null>(null);
   const [visits, setVisits] = useState<UniqueVisit[]>([]);

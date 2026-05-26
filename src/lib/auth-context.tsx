@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isOperator: true,
             operatorCourtIds: data.operatorCourtIds ?? [],
             subscriptionStatus: data.subscriptionStatus ?? "none",
+            subscriptionQuantity: typeof data.subscriptionQuantity === "number" ? data.subscriptionQuantity : 1,
             subscriptionExpiresAt: data.subscriptionExpiresAt ?? undefined,
             applicationStatus: data.applicationStatus,
             freeAccess: data.freeAccess ?? false,

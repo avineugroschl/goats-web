@@ -16,6 +16,7 @@ import {
 import { ref, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { useSelectedCourt } from "@/lib/selected-court";
 import { Court, DaySchedule, CourtPromo, CourtBanner, ScheduleOverride } from "@/lib/types";
 import { uploadCourtMainPhoto, uploadCourtGalleryPhoto } from "@/lib/processImage";
 
@@ -34,7 +35,7 @@ interface GalleryPhoto {
 
 export default function CourtManagement() {
   const { profile } = useAuth();
-  const courtId = profile?.operatorCourtIds?.[0];
+  const courtId = useSelectedCourt();
 
   const [court, setCourt] = useState<Court | null>(null);
   const [loading, setLoading] = useState(true);

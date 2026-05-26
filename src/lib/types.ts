@@ -33,6 +33,10 @@ export interface Court {
   // in the apps; false = draft, hidden from app queries (filtered client-side).
   // Admin-created courts and user-submitted approved courts never set this.
   published?: boolean;
+  // Stamped by admin approval. Used to order operatorCourtIds deterministically
+  // so the activation lock (first N courts where N = subscriptionQuantity) is
+  // stable across reloads. Missing on legacy/admin-created courts — those sort first.
+  approvedAt?: unknown;
 }
 
 export interface TimeSlot {
@@ -138,6 +142,10 @@ export interface OperatorRecord {
   businessName?: string;
   operatorCourtIds?: string[];
   subscriptionStatus?: "active" | "past_due" | "cancelled" | "cancelling" | "none";
+  // Mirror of the Stripe subscription quantity (number of seats / courts paid for).
+  // Synced by the Stripe webhook on customer.subscription.updated. First N courts
+  // (ordered by approvedAt ASC) are active; the rest are locked pending activation.
+  subscriptionQuantity?: number;
   applicationStatus?: "pending" | "approved" | "rejected";
   subscriptionExpiresAt?: string;
   createdAt?: unknown;
@@ -156,6 +164,10 @@ export interface OperatorProfile {
   isOperator: boolean;
   operatorCourtIds?: string[];
   subscriptionStatus?: "active" | "past_due" | "cancelled" | "cancelling" | "none";
+  // Number of court seats covered by the current subscription.
+  // First N operatorCourtIds (sorted by approvedAt ASC) are active; rest are locked.
+  // freeAccess operators are treated as having unlimited seats.
+  subscriptionQuantity?: number;
   subscriptionExpiresAt?: string;
   applicationStatus?: "pending" | "approved" | "rejected";
   freeAccess?: boolean;

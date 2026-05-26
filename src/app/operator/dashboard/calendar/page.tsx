@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { useSelectedCourt } from "@/lib/selected-court";
 import { Reservation, TimeSlot } from "@/lib/types";
 import { RESERVATIONS_ENABLED } from "@/lib/features";
 
@@ -67,7 +68,7 @@ function ReservationsDisabled() {
 
 function CalendarPageImpl() {
   const { profile } = useAuth();
-  const courtId = profile?.operatorCourtIds?.[0];
+  const courtId = useSelectedCourt();
 
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);

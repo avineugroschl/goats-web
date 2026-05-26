@@ -18,6 +18,7 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
+  arrayUnion,
 } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
@@ -66,6 +67,11 @@ export default function AdminReviewPanel() {
         <div className="flex items-center gap-4">
           {profile?.email && (
             <span className="hidden text-xs text-white/30 sm:inline">{profile.email}</span>
+          )}
+          {profile?.isOperator && (
+            <Link href="/operator/dashboard" className="text-sm text-teal/70 transition-colors hover:text-teal">
+              Operator Dashboard
+            </Link>
           )}
           <Link href="/" className="text-sm text-white/40 transition-colors hover:text-white/60">
             Back to Site
@@ -182,6 +188,7 @@ function ApplicationsTab() {
           promo: null,
           operatorBanner: null,
           published: false,
+          approvedAt: serverTimestamp(),
         });
         courtId = newCourtId;
       } else if (app.type === "claim_existing" && courtId) {
@@ -194,8 +201,9 @@ function ApplicationsTab() {
             return;
           }
           await updateDoc(doc(db, "courts", courtId), {
-            operatorIds: [app.applicantId],
+            operatorIds: arrayUnion(app.applicantId),
             verified: true,
+            approvedAt: serverTimestamp(),
           });
         }
       }
@@ -208,8 +216,10 @@ function ApplicationsTab() {
 
       const operatorUpdate: Record<string, unknown> = {
         applicationStatus: "approved",
-        operatorCourtIds: courtId ? [courtId] : [],
       };
+      if (courtId) {
+        operatorUpdate.operatorCourtIds = arrayUnion(courtId);
+      }
       if (freeAccess[app.id]) {
         operatorUpdate.subscriptionStatus = "active";
         operatorUpdate.freeAccess = true;

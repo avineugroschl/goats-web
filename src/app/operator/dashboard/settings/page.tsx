@@ -1,24 +1,56 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { signOut } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
-import { auth, functions } from "@/lib/firebase";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  where,
+  Unsubscribe,
+} from "firebase/firestore";
+import { auth, db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { Court } from "@/lib/types";
+
+interface PendingApp {
+  id: string;
+  type: "new_court" | "claim_existing";
+  courtId?: string;
+  courtName?: string;
+}
 
 export default function OperatorSettings() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [billingLoading, setBillingLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [showAddSuccess, setShowAddSuccess] = useState(false);
 
   const isSubscribed = profile?.subscriptionStatus === "active";
   const isCancelling = profile?.subscriptionStatus === "cancelling";
   const isFreeAccess = !!profile?.freeAccess;
   const hasAccess = isSubscribed || isCancelling;
+
+  // Show + auto-dismiss success toast after coming back from add-court.
+  useEffect(() => {
+    if (searchParams.get("addCourt") === "success") {
+      setShowAddSuccess(true);
+      // Strip the query param so a reload doesn't re-show the toast.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("addCourt");
+      window.history.replaceState({}, "", url.toString());
+      const timer = setTimeout(() => setShowAddSuccess(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
 
   async function handleManageBilling() {
     setBillingLoading(true);
@@ -40,6 +72,28 @@ export default function OperatorSettings() {
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl font-bold text-white">Account</h1>
+
+      {showAddSuccess && (
+        <div className="rounded-2xl border border-status-confirmed/30 bg-status-confirmed/5 px-5 py-4">
+          <p className="font-display mb-1 text-xs font-bold uppercase tracking-widest text-status-confirmed">
+            Application Submitted
+          </p>
+          <p className="text-sm text-white/60">
+            Your new court application is under review. You&apos;ll see it in your sidebar
+            as &quot;Pending&quot; until admin approves.
+          </p>
+        </div>
+      )}
+
+      {/* Manage Courts */}
+      {user && profile?.operatorCourtIds && (
+        <ManageCourtsSection
+          uid={user.uid}
+          operatorCourtIds={profile.operatorCourtIds}
+          subscriptionQuantity={profile.subscriptionQuantity ?? 1}
+          freeAccess={isFreeAccess}
+        />
+      )}
 
       {/* Account info */}
       <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
@@ -201,6 +255,174 @@ function SettingsRow({
     <div className="flex items-center justify-between py-1">
       <span className="text-sm text-white/40">{label}</span>
       <span className={`text-sm font-medium ${valueColor ?? "text-white"}`}>{value}</span>
+    </div>
+  );
+}
+
+function ManageCourtsSection({
+  uid,
+  operatorCourtIds,
+  subscriptionQuantity,
+  freeAccess,
+}: {
+  uid: string;
+  operatorCourtIds: string[];
+  subscriptionQuantity: number;
+  freeAccess: boolean;
+}) {
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [pending, setPending] = useState<PendingApp[]>([]);
+  const [claimedCourtNames, setClaimedCourtNames] = useState<Record<string, string>>({});
+
+  // Subscribe to each operatorCourtIds doc.
+  useEffect(() => {
+    if (operatorCourtIds.length === 0) {
+      setCourts([]);
+      return;
+    }
+    const unsubs: Unsubscribe[] = [];
+    const map = new Map<string, Court>();
+    operatorCourtIds.forEach((id) => {
+      const unsub = onSnapshot(doc(db, "courts", id), (snap) => {
+        if (snap.exists()) {
+          map.set(id, { id: snap.id, ...snap.data() } as Court);
+        } else {
+          map.delete(id);
+        }
+        setCourts(operatorCourtIds.map((cid) => map.get(cid)).filter(Boolean) as Court[]);
+      });
+      unsubs.push(unsub);
+    });
+    return () => unsubs.forEach((u) => u());
+  }, [operatorCourtIds]);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "operator_applications"),
+      where("applicantId", "==", uid),
+      where("status", "==", "pending")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const apps: PendingApp[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          type: data.type,
+          courtId: data.courtId,
+          courtName: data.courtData?.name,
+        };
+      });
+      setPending(apps);
+    });
+    return unsub;
+  }, [uid]);
+
+  // Fetch names for claim_existing pending apps.
+  useEffect(() => {
+    const idsToFetch = pending
+      .filter((p) => p.type === "claim_existing" && p.courtId && !claimedCourtNames[p.courtId])
+      .map((p) => p.courtId!) as string[];
+    if (idsToFetch.length === 0) return;
+    const unsubs: Unsubscribe[] = [];
+    idsToFetch.forEach((id) => {
+      const unsub = onSnapshot(doc(db, "courts", id), (snap) => {
+        if (snap.exists()) {
+          setClaimedCourtNames((prev) => ({ ...prev, [id]: snap.data().name ?? "Court" }));
+        }
+      });
+      unsubs.push(unsub);
+    });
+    return () => unsubs.forEach((u) => u());
+  }, [pending, claimedCourtNames]);
+
+  // Order courts by approvedAt ASC (legacy courts sort first).
+  const orderedCourts = [...courts].sort((a, b) => {
+    const toMillis = (c: Court): number => {
+      const ts = c.approvedAt as { toMillis?: () => number } | undefined;
+      if (ts && typeof ts.toMillis === "function") {
+        try { return ts.toMillis(); } catch { return 0; }
+      }
+      return 0;
+    };
+    return toMillis(a) - toMillis(b);
+  });
+
+  const activeThreshold = freeAccess ? Infinity : subscriptionQuantity;
+
+  return (
+    <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
+            Manage Courts
+          </h3>
+          <p className="mt-1 text-xs text-white/30">
+            {orderedCourts.length} court{orderedCourts.length === 1 ? "" : "s"} in your portfolio
+            {pending.length > 0 && ` · ${pending.length} pending`}
+          </p>
+        </div>
+        <Link
+          href="/operator/dashboard/add-court"
+          className="rounded-xl bg-teal px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-surface-dark transition-all hover:bg-teal-dark"
+        >
+          + Add Court
+        </Link>
+      </div>
+
+      <div className="space-y-2">
+        {orderedCourts.length === 0 && pending.length === 0 ? (
+          <p className="rounded-xl bg-dash-bg px-4 py-6 text-center text-sm text-white/30">
+            No courts yet.
+          </p>
+        ) : (
+          <>
+            {orderedCourts.map((court, index) => {
+              const isLocked = index >= activeThreshold;
+              return (
+                <div
+                  key={court.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-dash-border bg-dash-bg px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">{court.name}</p>
+                    <p className="truncate text-xs text-white/40">{court.address}</p>
+                  </div>
+                  {isLocked ? (
+                    <span className="shrink-0 rounded-full bg-status-pending/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-status-pending">
+                      Locked
+                    </span>
+                  ) : (
+                    <span className="shrink-0 rounded-full bg-status-confirmed/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-status-confirmed">
+                      Active
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            {pending.map((p) => {
+              const name = p.type === "new_court"
+                ? (p.courtName ?? "New court")
+                : (p.courtId ? (claimedCourtNames[p.courtId] ?? "Court") : "Court");
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-dash-border bg-dash-bg px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">{name}</p>
+                    <p className="truncate text-xs text-white/40">
+                      {p.type === "new_court" ? "New court submission" : "Claim request"}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-status-pending/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-status-pending">
+                    Pending
+                  </span>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
     </div>
   );
 }

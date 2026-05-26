@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -10,6 +10,10 @@ import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { RESERVATIONS_ENABLED, PAYMENT_GATING_ENABLED } from "@/lib/features";
+import { SelectedCourtProvider, useSelectedCourt } from "@/lib/selected-court";
+import { CourtSwitcher } from "@/components/CourtSwitcher";
+import { ActivateCourtModal } from "@/components/ActivateCourtModal";
+import { Court } from "@/lib/types";
 
 const allNavItems = [
   {
@@ -118,20 +122,86 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     profile?.subscriptionStatus !== "cancelling";
 
   return (
+    <SelectedCourtProvider uid={user.uid} courtIds={profile.operatorCourtIds ?? []}>
+      <DashboardShell
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        pathname={pathname}
+        userEmail={profile?.email || user.email || ""}
+        uid={user.uid}
+        isAdmin={!!profile?.isAdmin}
+        isPending={isPending}
+        isRejected={isRejected}
+        needsPayment={needsPayment}
+        operatorCourtIds={profile.operatorCourtIds ?? []}
+        subscriptionQuantity={profile.subscriptionQuantity ?? 1}
+        freeAccess={profile.freeAccess}
+        onSignOut={async () => { await signOut(auth); router.push("/operator"); }}
+      >
+        {children}
+      </DashboardShell>
+    </SelectedCourtProvider>
+  );
+}
+
+interface DashboardShellProps {
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  pathname: string | null;
+  userEmail: string;
+  uid: string;
+  isAdmin: boolean;
+  isPending: boolean;
+  isRejected: boolean;
+  needsPayment: boolean;
+  operatorCourtIds: string[];
+  subscriptionQuantity: number;
+  freeAccess?: boolean;
+  onSignOut: () => Promise<void>;
+  children: React.ReactNode;
+}
+
+function DashboardShell({
+  sidebarOpen,
+  setSidebarOpen,
+  pathname,
+  userEmail,
+  uid,
+  isAdmin,
+  isPending,
+  isRejected,
+  needsPayment,
+  operatorCourtIds,
+  subscriptionQuantity,
+  freeAccess,
+  onSignOut,
+  children,
+}: DashboardShellProps) {
+  const selectedCourtId = useSelectedCourt();
+  const [activateModalCourt, setActivateModalCourt] = useState<Court | null>(null);
+
+  return (
     <div className="flex min-h-screen bg-dash-bg">
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-dash-border bg-dash-sidebar transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       }`}>
-        {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-dash-border px-6">
-          <img src="/app-icon.png" alt="G.O.A.T.S" className="h-8 w-8 rounded-lg" />
-          <div>
-            <span className="font-display text-sm font-bold text-white">G.O.A.T.S</span>
-            <span className="ml-2 rounded bg-teal/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal">
+        {/* Logo + court switcher */}
+        <div className="border-b border-dash-border px-4 py-3">
+          <div className="mb-2 flex items-center gap-2 px-2">
+            <img src="/app-icon.png" alt="G.O.A.T.S" className="h-7 w-7 rounded-lg" />
+            <span className="font-display text-xs font-bold text-white">G.O.A.T.S</span>
+            <span className="rounded bg-teal/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal">
               Operator
             </span>
           </div>
+          <CourtSwitcher
+            uid={uid}
+            operatorCourtIds={operatorCourtIds}
+            subscriptionQuantity={subscriptionQuantity}
+            freeAccess={freeAccess}
+            onActivateCourt={(c) => setActivateModalCourt(c)}
+          />
         </div>
 
         {/* Nav links */}
@@ -158,7 +228,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Admin section — only for superadmins */}
-          {profile?.isAdmin && (
+          {isAdmin && (
             <div className="mt-6 border-t border-dash-border pt-4">
               <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-dash-text-muted">
                 Admin
@@ -187,13 +257,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* User info + sign out */}
         <div className="border-t border-dash-border p-4">
           <div className="mb-3 truncate text-xs text-dash-text-muted">
-            {profile?.email || user.email}
+            {userEmail}
           </div>
           <button
-            onClick={async () => {
-              await signOut(auth);
-              router.push("/operator");
-            }}
+            onClick={onSignOut}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/30 transition-colors hover:bg-dash-surface-hover hover:text-white/60"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -250,15 +317,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <PaymentRequiredState />
           ) : (
             <>
-              {!isPending && !isRejected && profile?.operatorCourtIds?.length && profile.operatorCourtIds.length > 0 && (() => {
-                // Show unpublished banner on all pages — reads the court doc's published field
-                return <UnpublishedBanner courtId={profile.operatorCourtIds[0]} />;
-              })()}
+              {selectedCourtId && (
+                <UnpublishedBanner courtId={selectedCourtId} />
+              )}
               {children}
             </>
           )}
         </main>
       </div>
+
+      {activateModalCourt && (
+        <ActivateCourtModal
+          court={activateModalCourt}
+          currentQuantity={subscriptionQuantity}
+          onClose={() => setActivateModalCourt(null)}
+          onActivated={() => setActivateModalCourt(null)}
+        />
+      )}
     </div>
   );
 }
@@ -267,16 +342,13 @@ function UnpublishedBanner({ courtId }: { courtId: string }) {
   const [published, setPublished] = useState<boolean | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, "courts", courtId));
-        if (snap.exists()) {
-          setPublished(snap.data().published !== false);
-        }
-      } catch {
-        // silent
+    setPublished(null);
+    const unsub = onSnapshot(doc(db, "courts", courtId), (snap) => {
+      if (snap.exists()) {
+        setPublished(snap.data().published !== false);
       }
-    })();
+    });
+    return unsub;
   }, [courtId]);
 
   if (published !== false) return null;
