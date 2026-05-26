@@ -64,16 +64,21 @@ export default function AdminReviewPanel() {
             Admin
           </span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {profile?.email && (
-            <span className="hidden text-xs text-white/30 sm:inline">{profile.email}</span>
+            <span className="hidden text-xs text-white/30 lg:inline">{profile.email}</span>
           )}
-          {profile?.isOperator && (
-            <Link href="/operator/dashboard" className="text-sm text-teal/70 transition-colors hover:text-teal">
-              Operator Dashboard
-            </Link>
-          )}
-          <Link href="/" className="text-sm text-white/40 transition-colors hover:text-white/60">
+          <Link
+            href="/operator/dashboard"
+            className="flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/10 px-3 py-1.5 text-xs font-semibold text-teal transition-colors hover:border-teal/60 hover:bg-teal/15"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            Operator Dashboard
+          </Link>
+          <Link href="/" className="hidden text-sm text-white/40 transition-colors hover:text-white/60 sm:inline">
             Back to Site
           </Link>
           <button
