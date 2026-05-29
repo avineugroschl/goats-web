@@ -7,7 +7,6 @@ export interface Court {
   accessType: string;
   latitude: number;
   longitude: number;
-  currentUsers: number;
   activeUserIds: string[];
   hasLights: boolean;
   hoursOfOperation: string;
