@@ -11,7 +11,7 @@
 //
 // Quality: 80 (matches mobile)
 
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "./firebase";
 
 const QUALITY = 0.8;
@@ -170,6 +170,20 @@ export async function uploadCourtMainPhoto(
   ]);
 
   return { cardUrl, fullUrl };
+}
+
+/**
+ * Delete both the card and full variants of a court's main photo.
+ * Best-effort — swallows "not found" errors so callers can safely call
+ * this before re-uploading a replacement.
+ */
+export async function deleteCourtMainPhoto(courtId: string): Promise<void> {
+  const cardRef = ref(storage, `court_photos/${courtId}_card.webp`);
+  const fullRef = ref(storage, `court_photos/${courtId}_full.webp`);
+  await Promise.all([
+    deleteObject(cardRef).catch(() => {}),
+    deleteObject(fullRef).catch(() => {}),
+  ]);
 }
 
 /**

@@ -25,7 +25,7 @@ import { auth, db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { OperatorApplication, NewCourtData } from "@/lib/types";
 
-type AdminTab = "applications" | "courts" | "dashboard";
+type AdminTab = "applications" | "courts" | "liveCourts" | "dashboard";
 type DashTab = "comments" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -42,6 +42,17 @@ export default function AdminReviewPanel() {
       router.push("/");
     }
   }, [authLoading, user, profile, router]);
+
+  // Honor ?tab=... on first mount so the form pages can navigate back to a
+  // specific tab. Read once from window.location to avoid the Suspense
+  // requirement of Next.js 15's useSearchParams hook.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "applications" || tab === "courts" || tab === "liveCourts" || tab === "dashboard") {
+      setActiveTab(tab);
+    }
+  }, []);
 
   if (authLoading) {
     return (
@@ -104,6 +115,7 @@ export default function AdminReviewPanel() {
           {([
             { id: "applications" as const, label: "Operator Applications" },
             { id: "courts" as const, label: "Pending Courts" },
+            { id: "liveCourts" as const, label: "All Courts" },
             { id: "dashboard" as const, label: "Dashboard" },
           ]).map((tab) => (
             <button
@@ -124,6 +136,7 @@ export default function AdminReviewPanel() {
       <div className="mx-auto max-w-5xl px-6 py-8 sm:px-12">
         {activeTab === "applications" && <ApplicationsTab />}
         {activeTab === "courts" && <PendingCourtsTab />}
+        {activeTab === "liveCourts" && <LiveCourtsTab />}
         {activeTab === "dashboard" && <DashboardTab />}
       </div>
     </main>
@@ -181,7 +194,6 @@ function ApplicationsTab() {
           photoUrl: cardUrl,
           photoUrlCard: cardUrl,
           photoUrlFull: fullUrl,
-          currentUsers: 0,
           activeUserIds: [],
           geofenceRadiusMeters: 100,
           hoursOfOperation: app.courtData.hoursOfOperation || "",
@@ -426,7 +438,6 @@ function PendingCourtsTab() {
         photoUrl: court.photoUrlCard || court.photoUrl || "",
         photoUrlCard: court.photoUrlCard || "",
         photoUrlFull: court.photoUrlFull || "",
-        currentUsers: 0,
         activeUserIds: [],
         geofenceRadiusMeters: 100,
       });
@@ -555,7 +566,145 @@ function PendingCourtsTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TAB 3: ADMIN DASHBOARD (Comments, Users, Profile Pics, Check-Ins, Ratings)
+// TAB 3: ALL COURTS (browse + add + edit live courts)
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface LiveCourtRow {
+  id: string;
+  name: string;
+  address: string;
+  baskets: number;
+  setting: string;
+  accessType: string;
+  photoUrlCard: string;
+  photoUrl: string;
+  operatorIds?: string[];
+}
+
+function LiveCourtsTab() {
+  const [courts, setCourts] = useState<LiveCourtRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const snap = await getDocs(collection(db, "courts"));
+      const list = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          name: data.name ?? "",
+          address: data.address ?? "",
+          baskets: data.baskets ?? 0,
+          setting: data.setting ?? "",
+          accessType: data.accessType ?? "",
+          photoUrlCard: data.photoUrlCard ?? "",
+          photoUrl: data.photoUrl ?? "",
+          operatorIds: data.operatorIds ?? [],
+        };
+      });
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      setCourts(list);
+      setLoading(false);
+    })();
+  }, []);
+
+  const filtered = search.trim()
+    ? courts.filter((c) => {
+        const q = search.trim().toLowerCase();
+        return (
+          c.name.toLowerCase().includes(q) ||
+          c.address.toLowerCase().includes(q)
+        );
+      })
+    : courts;
+
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-white">All Courts</h1>
+          <p className="text-sm text-white/40">
+            {courts.length} live court{courts.length === 1 ? "" : "s"}
+          </p>
+        </div>
+        <Link
+          href="/admin/courts/new"
+          className="flex items-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-surface-dark transition-all hover:bg-teal/90"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Add Court
+        </Link>
+      </div>
+
+      <div className="mb-5">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name or address…"
+          className="w-full rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-teal/60 focus:outline-none"
+        />
+      </div>
+
+      {loading ? (
+        <LoadingSpinner />
+      ) : filtered.length === 0 ? (
+        <EmptyState text={search.trim() ? "No matching courts" : "No courts yet"} />
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((c) => {
+            const thumb = c.photoUrlCard || c.photoUrl;
+            const isOperatorManaged = (c.operatorIds?.length ?? 0) > 0;
+            return (
+              <Link
+                key={c.id}
+                href={`/admin/courts/${c.id}/edit`}
+                className="flex items-center gap-4 rounded-xl border border-dash-border bg-dash-surface px-4 py-3 transition-colors hover:border-teal/40"
+              >
+                {thumb ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={thumb} alt="" className="h-14 w-20 shrink-0 rounded-lg object-cover" />
+                ) : (
+                  <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg bg-dash-bg text-[10px] text-white/30">
+                    No photo
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium text-white">
+                      {c.name || "Unnamed"}
+                    </p>
+                    {isOperatorManaged && (
+                      <span className="rounded-full bg-teal/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-teal">
+                        Operator
+                      </span>
+                    )}
+                  </div>
+                  <p className="truncate text-xs text-white/40">{c.address || "—"}</p>
+                  <p className="mt-0.5 text-[11px] text-white/30">
+                    {c.baskets || 0} basket{c.baskets === 1 ? "" : "s"}
+                    {c.setting && ` · ${c.setting}`}
+                    {c.accessType && ` · ${c.accessType}`}
+                  </p>
+                </div>
+                <div className="shrink-0 text-xs font-semibold text-teal">
+                  Edit →
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TAB 4: ADMIN DASHBOARD (Comments, Users, Profile Pics, Check-Ins, Ratings)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function DashboardTab() {
