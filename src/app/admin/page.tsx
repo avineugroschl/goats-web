@@ -25,7 +25,7 @@ import { auth, db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { OperatorApplication, NewCourtData } from "@/lib/types";
 
-type AdminTab = "applications" | "courts" | "liveCourts" | "dashboard";
+type AdminTab = "applications" | "courts" | "liveCourts" | "dashboard" | "ambassadors";
 type DashTab = "comments" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -49,7 +49,7 @@ export default function AdminReviewPanel() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const tab = new URLSearchParams(window.location.search).get("tab");
-    if (tab === "applications" || tab === "courts" || tab === "liveCourts" || tab === "dashboard") {
+    if (tab === "applications" || tab === "courts" || tab === "liveCourts" || tab === "dashboard" || tab === "ambassadors") {
       setActiveTab(tab);
     }
   }, []);
@@ -116,6 +116,7 @@ export default function AdminReviewPanel() {
             { id: "applications" as const, label: "Operator Applications" },
             { id: "courts" as const, label: "Pending Courts" },
             { id: "liveCourts" as const, label: "All Courts" },
+            { id: "ambassadors" as const, label: "Ambassadors" },
             { id: "dashboard" as const, label: "Dashboard" },
           ]).map((tab) => (
             <button
@@ -137,6 +138,7 @@ export default function AdminReviewPanel() {
         {activeTab === "applications" && <ApplicationsTab />}
         {activeTab === "courts" && <PendingCourtsTab />}
         {activeTab === "liveCourts" && <LiveCourtsTab />}
+        {activeTab === "ambassadors" && <AmbassadorsTab />}
         {activeTab === "dashboard" && <DashboardTab />}
       </div>
     </main>
@@ -1030,6 +1032,232 @@ function DeletedOperatorsPanel() {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TAB 5: AMBASSADORS (referral codes + click/signup counters)
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface Ambassador {
+  id: string; // doc id IS the code
+  name: string;
+  clicks: number;
+  signups: number;
+  active: boolean;
+  createdAt: Timestamp | null;
+  lastClickAt?: Timestamp | null;
+  lastSignupAt?: Timestamp | null;
+}
+
+// Avoid ambiguous chars (0/O, 1/I/L) so codes are readable when transcribed.
+const AMBASSADOR_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const AMBASSADOR_CODE_LENGTH = 6;
+
+function generateAmbassadorCode(): string {
+  let code = "";
+  for (let i = 0; i < AMBASSADOR_CODE_LENGTH; i++) {
+    code += AMBASSADOR_CODE_ALPHABET[Math.floor(Math.random() * AMBASSADOR_CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
+function AmbassadorsTab() {
+  const { user } = useAuth();
+  const [ambassadors, setAmbassadors] = useState<Ambassador[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, "ambassadors"), orderBy("createdAt", "desc")));
+      setAmbassadors(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Ambassador)));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreate() {
+    const name = newName.trim();
+    if (!name) return;
+    setCreating(true);
+    try {
+      // Generate a code, retry up to a few times on collision.
+      let code = "";
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = generateAmbassadorCode();
+        const existing = await getDoc(doc(db, "ambassadors", candidate));
+        if (!existing.exists()) {
+          code = candidate;
+          break;
+        }
+      }
+      if (!code) {
+        alert("Could not generate a unique code. Try again.");
+        return;
+      }
+
+      await setDoc(doc(db, "ambassadors", code), {
+        name,
+        clicks: 0,
+        signups: 0,
+        active: true,
+        createdAt: serverTimestamp(),
+        createdBy: user?.uid ?? "",
+      });
+      setNewName("");
+      await load();
+    } catch (err) {
+      console.error("Failed to create ambassador:", err);
+      alert("Failed to create ambassador. Check console.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleToggleActive(amb: Ambassador) {
+    try {
+      await updateDoc(doc(db, "ambassadors", amb.id), { active: !amb.active });
+      setAmbassadors((prev) => prev.map((a) => a.id === amb.id ? { ...a, active: !amb.active } : a));
+    } catch (err) {
+      console.error("Toggle failed:", err);
+    }
+  }
+
+  async function handleDelete(code: string) {
+    if (!confirm(`Delete ambassador "${code}"? Their click history will remain in the subcollection but the code will stop attributing new signups.`)) return;
+    try {
+      await deleteDoc(doc(db, "ambassadors", code));
+      setAmbassadors((prev) => prev.filter((a) => a.id !== code));
+    } catch (err) {
+      console.error("Delete failed:", err);
+    }
+  }
+
+  async function copyLink(code: string) {
+    const url = `https://goatssportsapp.com/r/${code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode((c) => c === code ? null : c), 1500);
+    } catch {
+      // Fallback: select and copy
+      window.prompt("Copy this URL:", url);
+    }
+  }
+
+  if (loading) return <LoadingSpinner />;
+
+  const activeCount = ambassadors.filter((a) => a.active).length;
+  const totalClicks = ambassadors.reduce((s, a) => s + (a.clicks || 0), 0);
+  const totalSignups = ambassadors.reduce((s, a) => s + (a.signups || 0), 0);
+
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-white">Ambassadors</h1>
+          <p className="text-sm text-white/40">
+            {activeCount} active · {totalClicks} click{totalClicks === 1 ? "" : "s"} · {totalSignups} signup{totalSignups === 1 ? "" : "s"}
+          </p>
+        </div>
+      </div>
+
+      {/* Create form */}
+      <div className="mb-6 rounded-2xl border border-dash-border bg-dash-surface p-5">
+        <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-white/30">New Ambassador</p>
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Name (e.g. Mike Smith)"
+            className="flex-1 rounded-xl border border-dash-border bg-dash-bg px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-teal/60 focus:outline-none"
+            onKeyDown={(e) => { if (e.key === "Enter") void handleCreate(); }}
+          />
+          <button
+            onClick={() => void handleCreate()}
+            disabled={creating || !newName.trim()}
+            className="rounded-xl bg-teal px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-surface-dark transition-all hover:bg-teal/90 disabled:opacity-50"
+          >
+            {creating ? "..." : "Create"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-white/30">A 6-character code is generated automatically.</p>
+      </div>
+
+      {/* Ambassador list */}
+      {ambassadors.length === 0 ? (
+        <EmptyState text="No ambassadors yet" />
+      ) : (
+        <div className="space-y-3">
+          {ambassadors.map((amb) => {
+            const url = `https://goatssportsapp.com/r/${amb.id}`;
+            return (
+              <div key={amb.id} className="rounded-2xl border border-dash-border bg-dash-surface p-5">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-lg font-semibold text-white">{amb.name}</h3>
+                      {!amb.active && (
+                        <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 font-mono text-sm font-bold tracking-wider text-teal">{amb.id}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="font-display text-xl font-bold text-white">{amb.clicks || 0}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-white/30">Clicks</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-display text-xl font-bold text-coral">{amb.signups || 0}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-white/30">Signups</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-dash-bg px-3 py-2">
+                  <code className="flex-1 truncate text-xs text-white/60">{url}</code>
+                  <button
+                    onClick={() => void copyLink(amb.id)}
+                    className="rounded-md border border-dash-border px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/60 transition-colors hover:border-teal/40 hover:text-teal"
+                  >
+                    {copiedCode === amb.id ? "Copied" : "Copy"}
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => void handleToggleActive(amb)}
+                    className="rounded-lg border border-dash-border px-3 py-1.5 text-xs text-white/60 transition-colors hover:border-white/40 hover:text-white"
+                  >
+                    {amb.active ? "Deactivate" : "Activate"}
+                  </button>
+                  <button
+                    onClick={() => void handleDelete(amb.id)}
+                    className="rounded-lg border border-dash-border px-3 py-1.5 text-xs text-status-rejected/70 transition-colors hover:border-status-rejected/40 hover:text-status-rejected"
+                  >
+                    Delete
+                  </button>
+                  <span className="ml-auto text-[10px] text-white/30">
+                    {amb.createdAt ? `Created ${formatTs(amb.createdAt)}` : ""}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED COMPONENTS
