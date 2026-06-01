@@ -12,6 +12,12 @@ export default function AmbassadorRedirect() {
   useEffect(() => {
     const rawCode = params?.code ?? '';
     const code = rawCode.trim().toUpperCase();
+
+    if (code.length === 0) {
+      window.location.href = APP_CONFIG.homeUrl;
+      return;
+    }
+
     const device = getDeviceType();
 
     // Carry through any utm_* the ambassador appended, in addition to ours.
@@ -24,34 +30,33 @@ export default function AmbassadorRedirect() {
       if (key.startsWith('utm_')) utmParams[key] = value;
     }
 
-    const redirect = () => {
-      if (device === 'ios') {
-        window.location.href = buildStoreUrl(APP_CONFIG.appStoreUrl, utmParams);
-      } else if (device === 'android') {
-        // Play Install Referrer surfaces the `referrer` query param to the
-        // app on first launch. Pass the bare code — Android side decodes
-        // url-encoded value and reads it directly.
-        window.location.href = buildStoreUrl(APP_CONFIG.playStoreUrl, {
-          ...utmParams,
-          referrer: code,
-        });
-      } else {
-        window.location.href = APP_CONFIG.homeUrl;
-      }
-    };
+    const destination =
+      device === 'ios'
+        ? buildStoreUrl(APP_CONFIG.appStoreUrl, utmParams)
+        : device === 'android'
+          ? // Play Install Referrer surfaces the `referrer` query param to
+            // the app on first launch. Pass the bare code — Android side
+            // decodes url-encoded value and reads it directly.
+            buildStoreUrl(APP_CONFIG.playStoreUrl, { ...utmParams, referrer: code })
+          : APP_CONFIG.homeUrl;
 
-    const logAndRedirect = async () => {
-      // localStorage so iOS users can still pick up the code if they come back
-      // to the site after installing (web → app handoff).
-      try {
-        window.localStorage.setItem('goatsReferralCode', code);
-      } catch {
-        // Private-mode / quota errors — non-fatal.
-      }
+    // localStorage so iOS users can pick up the code if they come back to
+    // the site after installing (web → app handoff). Non-fatal.
+    try {
+      window.localStorage.setItem('goatsReferralCode', code);
+    } catch {
+      // Private-mode / quota errors.
+    }
 
+    // Fire-and-forget the click log. The redirect MUST NOT be gated on
+    // Firestore: Safari can stall Firestore's IndexedDB bootstrap under
+    // ITP / lockdown mode / content blockers, leaving an awaited getDoc
+    // pending forever without throwing. That used to leave users staring
+    // at a spinner that never resolved. The click write either lands
+    // before navigation cancels in-flight requests, or it's dropped —
+    // non-critical compared to actually delivering the user to the store.
+    void (async () => {
       try {
-        // Verify the code exists before writing a click. Avoids polluting
-        // the DB with clicks for mistyped/fake codes.
         const snap = await getDoc(doc(db, 'ambassadors', code));
         if (snap.exists() && snap.data()?.active !== false) {
           await addDoc(collection(db, 'ambassadors', code, 'clicks'), {
@@ -61,18 +66,11 @@ export default function AmbassadorRedirect() {
           });
         }
       } catch {
-        // Network/Firestore errors don't block the redirect.
+        // Network/Firestore errors don't matter — user already redirected.
       }
+    })();
 
-      redirect();
-    };
-
-    if (code.length === 0) {
-      window.location.href = APP_CONFIG.homeUrl;
-      return;
-    }
-
-    void logAndRedirect();
+    window.location.href = destination;
   }, [params]);
 
   return (
