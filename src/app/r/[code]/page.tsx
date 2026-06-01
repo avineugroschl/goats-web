@@ -2,9 +2,10 @@
 
 import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { APP_CONFIG, getDeviceType, buildStoreUrl } from '@/lib/app-config';
+
+const FIRESTORE_BASE =
+  'https://firestore.googleapis.com/v1/projects/goat-db/databases/(default)/documents';
 
 export default function AmbassadorRedirect() {
   const params = useParams<{ code: string }>();
@@ -48,27 +49,44 @@ export default function AmbassadorRedirect() {
       // Private-mode / quota errors.
     }
 
-    // Fire-and-forget the click log. The redirect MUST NOT be gated on
-    // Firestore: Safari can stall Firestore's IndexedDB bootstrap under
-    // ITP / lockdown mode / content blockers, leaving an awaited getDoc
-    // pending forever without throwing. That used to leave users staring
-    // at a spinner that never resolved. The click write either lands
-    // before navigation cancels in-flight requests, or it's dropped —
-    // non-critical compared to actually delivering the user to the store.
-    void (async () => {
-      try {
-        const snap = await getDoc(doc(db, 'ambassadors', code));
-        if (snap.exists() && snap.data()?.active !== false) {
-          await addDoc(collection(db, 'ambassadors', code, 'clicks'), {
-            ts: serverTimestamp(),
-            platform: device,
-            userAgent: navigator.userAgent.slice(0, 256),
-          });
-        }
-      } catch {
-        // Network/Firestore errors don't matter — user already redirected.
-      }
-    })();
+    // Fire-and-forget the click log via the Firestore REST API with
+    // `keepalive: true`. This is the browser API designed for "complete
+    // this request even if the page navigates away" (capped at 64KB).
+    //
+    // Why not the Firestore Web SDK: `addDoc` requires the SDK to finish
+    // its IndexedDB bootstrap before it can issue the network request,
+    // which can take 300ms+ on a cold visit and stalls indefinitely
+    // under Safari ITP / lockdown mode. The redirect cancels in-flight
+    // requests almost immediately, so SDK-bootstrap latency = dropped
+    // clicks in the wild.
+    //
+    // Why no `getDoc` prefilter: `onAmbassadorClickCreated` already
+    // deletes orphan clicks whose parent ambassador doesn't exist, so a
+    // fake-code click costs one trigger run and self-destructs server
+    // side. Skipping the prefilter halves the latency on the happy path.
+    //
+    // `ts` is client-time (REST API doesn't support `serverTimestamp()`
+    // sentinels without a separate documentTransform — for a click
+    // counter, ±seconds of clock drift is fine).
+    try {
+      void fetch(
+        `${FIRESTORE_BASE}/ambassadors/${encodeURIComponent(code)}/clicks`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: {
+              ts: { timestampValue: new Date().toISOString() },
+              platform: { stringValue: device },
+              userAgent: { stringValue: navigator.userAgent.slice(0, 256) },
+            },
+          }),
+          keepalive: true,
+        },
+      ).catch(() => {});
+    } catch {
+      // Network/CSP/blocker errors don't matter — user already redirected.
+    }
 
     window.location.href = destination;
   }, [params]);
