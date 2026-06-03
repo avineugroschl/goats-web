@@ -10,10 +10,12 @@ function PhoneFrame({
   src,
   alt,
   className,
+  priority,
 }: {
   src: string;
   alt: string;
   className?: string;
+  priority?: boolean;
 }) {
   return (
     <div className={className}>
@@ -25,6 +27,9 @@ function PhoneFrame({
             alt={alt}
             className="block w-full"
             draggable={false}
+            loading={priority ? "eager" : "lazy"}
+            decoding="async"
+            {...(priority ? { fetchPriority: "high" as const } : {})}
           />
         </div>
       </div>
@@ -182,6 +187,7 @@ export default function Home() {
                 <PhoneFrame
                   src="/screenshot-court-detail-new.jpg"
                   alt="Court details"
+                  priority
                 />
               </div>
               {/* Center phone */}
@@ -190,6 +196,7 @@ export default function Home() {
                   src="/screenshot-courts-new.jpg"
                   alt="G.O.A.T.S courts list"
                   className="w-[178px] lg:w-[190px]"
+                  priority
                 />
               </div>
               {/* Right phone */}
@@ -197,6 +204,7 @@ export default function Home() {
                 <PhoneFrame
                   src="/screenshot-ratings-new.jpg"
                   alt="Player ratings"
+                  priority
                 />
               </div>
             </div>
@@ -207,6 +215,7 @@ export default function Home() {
                 src="/screenshot-courts-new.jpg"
                 alt="G.O.A.T.S courts list"
                 className="w-[220px]"
+                priority
               />
             </div>
           </div>
@@ -224,7 +233,7 @@ export default function Home() {
 
           <div className="grid gap-5 sm:grid-cols-2">
             <FeatureCard
-              screenshot="/screenshot-find-courts.png"
+              screenshot="/screenshot-find-courts.jpg"
               badge="Discover"
               title="Find Courts"
               desc="Browse basketball courts with our custom reviews, details that matter, and commentary from the court."
@@ -404,7 +413,13 @@ function FeatureCard({
       </div>
       <div className="flex justify-center px-6 pt-4">
         <div className="w-32 overflow-hidden rounded-t-2xl shadow-lg transition-transform group-hover:-translate-y-1">
-          <img src={screenshot} alt={title} className="w-full" />
+          <img
+            src={screenshot}
+            alt={title}
+            className="w-full"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       </div>
     </div>

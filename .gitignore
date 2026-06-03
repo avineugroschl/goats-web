@@ -6,3 +6,4 @@ out/
 .env.production.local
 .DS_Store
 tsconfig.tsbuildinfo
+_image-originals/
