@@ -70,6 +70,12 @@ interface UniqueVisit {
   date: Date;         // earliest checkInTime as Date
 }
 
+interface PageView {
+  userId: string;     // sentinel for deleted accounts
+  dayKey: string;     // YYYY-MM-DD in court-local time
+  date: Date;         // raw UTC instant for cross-day window filtering
+}
+
 interface ActiveUserProfile {
   id: string;
   username: string;
@@ -87,11 +93,15 @@ export default function DashboardOverview() {
 
   const [court, setCourt] = useState<Court | null>(null);
   const [visits, setVisits] = useState<UniqueVisit[]>([]);
+  const [pageViews, setPageViews] = useState<PageView[]>([]);
   const [totalRatings, setTotalRatings] = useState(0);
   const [activeUsers, setActiveUsers] = useState<ActiveUserProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [checkInsRange, setCheckInsRange] = useState<Range>("30d");
+  // Independent range for the page-views line chart — operators can compare
+  // "check-ins last 7d" against "page views last 90d" at the same time.
+  const [pageViewsRange, setPageViewsRange] = useState<Range>("30d");
   const [selectedDow, setSelectedDow] = useState<number | null>(null);
   // When a daily bar is tapped, opens the same hourly modal but in
   // "single day" mode (showing that date's counts, not a DOW average).
@@ -221,6 +231,30 @@ export default function DashboardOverview() {
       );
 
       setVisits(unique);
+
+      // Court page views — last 90 days, written one doc per
+      // CourtDetailsScreen open by iOS/Android. Same composite index pattern
+      // as courtVisits ((courtId ASC, timestamp DESC)). No client-side
+      // dedup — both "raw views" stat card and "unique viewers" stat card
+      // are derived from this same set.
+      const pageViewsQuery = query(
+        collection(db, "courtPageViews"),
+        where("courtId", "==", cId),
+        where("timestamp", ">=", Timestamp.fromDate(ninetyDaysAgo)),
+        orderBy("timestamp", "desc"),
+        limit(10000)
+      );
+      const pageViewsSnap = await getDocs(pageViewsQuery);
+      const views: PageView[] = [];
+      pageViewsSnap.docs.forEach((d) => {
+        const data = d.data();
+        const ts = data.timestamp as Timestamp | undefined;
+        if (!ts) return;
+        const date = ts.toDate();
+        const dayKey = formatDayKey(toZonedTime(date, courtTimeZone));
+        views.push({ userId: data.userId as string, dayKey, date });
+      });
+      setPageViews(views);
 
       // Peer ratings count
       const ratingsQuery = query(
@@ -353,6 +387,40 @@ export default function DashboardOverview() {
     return visits.filter((v) => v.dayKey === todayKey).length;
   }, [visits, timeZone]);
 
+  // Page view stats — both raw (every open) and unique-by-userId. The
+  // sentinel-on-delete pattern means each deleted user still collapses to a
+  // single "unique viewer" instead of disappearing entirely.
+  const totalPageViews = useMemo(() => pageViews.length, [pageViews]);
+  const uniquePageViewers = useMemo(
+    () => new Set(pageViews.map((v) => v.userId)).size,
+    [pageViews]
+  );
+
+  // Page-views time series for the selected range. Mirrors `timeSeries`
+  // shape so the line chart consumes the same dayKey/count point format,
+  // but uses its own range toggle and counts raw views (no per-(user,day)
+  // dedup — we want the chart to reflect total engagement intensity).
+  const pageViewsTimeSeries = useMemo(() => {
+    const days = RANGE_DAYS[pageViewsRange];
+    const today = courtLocalCalendarDate(timeZone);
+
+    const counts = new Map<string, number>();
+    pageViews.forEach((v) => counts.set(v.dayKey, (counts.get(v.dayKey) ?? 0) + 1));
+
+    const points: { dayKey: string; label: string; count: number }[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = formatDayKey(d);
+      points.push({
+        dayKey: key,
+        label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        count: counts.get(key) ?? 0,
+      });
+    }
+    return points;
+  }, [pageViews, pageViewsRange, timeZone]);
+
   // Hourly breakdown for a single specific calendar day (court-local).
   // Drives the modal when an operator taps a day in the "Daily Check-ins"
   // bar chart. Values are raw counts, not averages — it's one day.
@@ -456,9 +524,14 @@ export default function DashboardOverview() {
       </div>
 
       {/* STAT CARDS */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* Left-to-right narrative: live → recent engagement → digital discovery
+          → unique discovery → slow-changing reputation. Responsive grid: 2 on
+          mobile, 3 on tablet (wraps cleanly), 5 on desktop. */}
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Today" value={todayCount} sub="unique check-ins" />
         <StatCard label="Last 90 Days" value={totalUnique} sub="unique check-ins" />
+        <StatCard label="Page Views" value={totalPageViews} sub="last 90 days" />
+        <StatCard label="Unique Viewers" value={uniquePageViewers} sub="last 90 days" />
         <StatCard label="Peer Ratings" value={totalRatings} sub="given at this court" />
       </div>
 
@@ -512,6 +585,61 @@ export default function DashboardOverview() {
                 }}
               />
             </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* PAGE VIEWS — line per day, paired with the check-ins bar chart
+          above. Different shape on purpose: bars are discrete events
+          ("who showed up"), line is the smoother discovery trend
+          ("who looked"). Stacked top-to-bottom so operators read them
+          as paired engagement narratives. */}
+      <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
+            Page Views per Day
+          </h3>
+          <RangeToggle value={pageViewsRange} onChange={setPageViewsRange} />
+        </div>
+        <p className="mb-6 text-xs text-dash-text-muted">
+          Every time someone opens this court&apos;s page in the app
+        </p>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={pageViewsTimeSeries} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
+              <XAxis
+                dataKey="label"
+                stroke="#777777"
+                tick={{ fontSize: 11 }}
+                interval={Math.max(0, Math.floor(pageViewsTimeSeries.length / 8))}
+              />
+              <YAxis
+                stroke="#777777"
+                tick={{ fontSize: 11 }}
+                allowDecimals={false}
+                domain={[0, (dataMax: number) => Math.max(dataMax, 1)]}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "#1A1A1A",
+                  border: "1px solid #2A2A2A",
+                  borderRadius: 12,
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: "#E5E5E5", fontWeight: 600 }}
+                itemStyle={{ color: "#3ECFB2" }}
+                formatter={(v) => [v as number, "views"]}
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke="#3ECFB2"
+                strokeWidth={2}
+                dot={{ fill: "#3ECFB2", r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
