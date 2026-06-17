@@ -535,6 +535,61 @@ export default function DashboardOverview() {
         <StatCard label="Peer Ratings" value={totalRatings} sub="given at this court" />
       </div>
 
+      {/* PAGE VIEWS — line per day, sits above the check-ins bar chart so
+          operators see the discovery trend first, then drill into who
+          actually showed up. Different shape on purpose: line for the
+          smoother "who looked" trend, bars below for discrete "who
+          showed up" events. */}
+      <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
+            Page Views per Day
+          </h3>
+          <RangeToggle value={pageViewsRange} onChange={setPageViewsRange} />
+        </div>
+        <p className="mb-6 text-xs text-dash-text-muted">
+          Every time someone opens this court&apos;s page in the app
+        </p>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={pageViewsTimeSeries} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
+              <XAxis
+                dataKey="label"
+                stroke="#777777"
+                tick={{ fontSize: 11 }}
+                interval={Math.max(0, Math.floor(pageViewsTimeSeries.length / 8))}
+              />
+              <YAxis
+                stroke="#777777"
+                tick={{ fontSize: 11 }}
+                allowDecimals={false}
+                domain={[0, (dataMax: number) => Math.max(dataMax, 1)]}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "#1A1A1A",
+                  border: "1px solid #2A2A2A",
+                  borderRadius: 12,
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: "#E5E5E5", fontWeight: 600 }}
+                itemStyle={{ color: "#3ECFB2" }}
+                formatter={(v) => [v as number, "views"]}
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke="#3ECFB2"
+                strokeWidth={2}
+                dot={{ fill: "#3ECFB2", r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* DAILY CHECK-INS — bar per day, tap to drill into that day's hours */}
       <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
@@ -585,61 +640,6 @@ export default function DashboardOverview() {
                 }}
               />
             </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* PAGE VIEWS — line per day, paired with the check-ins bar chart
-          above. Different shape on purpose: bars are discrete events
-          ("who showed up"), line is the smoother discovery trend
-          ("who looked"). Stacked top-to-bottom so operators read them
-          as paired engagement narratives. */}
-      <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
-            Page Views per Day
-          </h3>
-          <RangeToggle value={pageViewsRange} onChange={setPageViewsRange} />
-        </div>
-        <p className="mb-6 text-xs text-dash-text-muted">
-          Every time someone opens this court&apos;s page in the app
-        </p>
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={pageViewsTimeSeries} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
-              <XAxis
-                dataKey="label"
-                stroke="#777777"
-                tick={{ fontSize: 11 }}
-                interval={Math.max(0, Math.floor(pageViewsTimeSeries.length / 8))}
-              />
-              <YAxis
-                stroke="#777777"
-                tick={{ fontSize: 11 }}
-                allowDecimals={false}
-                domain={[0, (dataMax: number) => Math.max(dataMax, 1)]}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "#1A1A1A",
-                  border: "1px solid #2A2A2A",
-                  borderRadius: 12,
-                  fontSize: 12,
-                }}
-                labelStyle={{ color: "#E5E5E5", fontWeight: 600 }}
-                itemStyle={{ color: "#3ECFB2" }}
-                formatter={(v) => [v as number, "views"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="count"
-                stroke="#3ECFB2"
-                strokeWidth={2}
-                dot={{ fill: "#3ECFB2", r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
