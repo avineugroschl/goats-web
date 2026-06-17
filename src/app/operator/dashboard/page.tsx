@@ -384,34 +384,6 @@ export default function DashboardOverview() {
     });
   }, [selectedDayKey]);
 
-  // Typical hourly pattern averaged over the last 90 days (court-local).
-  // Each cell = total check-ins that hour over 90 days / 90 day count.
-  // Mirrors the in-app Popular Times chart but stays on `courtVisits` data
-  // so it survives account-deletion the same way the other charts do.
-  const typicalHourly = useMemo(() => {
-    const today = courtLocalCalendarDate(timeZone);
-    const ninetyDaysAgo = new Date(today);
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 89);
-
-    let totalDays = 0;
-    for (let d = new Date(ninetyDaysAgo); d <= today; d.setDate(d.getDate() + 1)) {
-      totalDays++;
-    }
-
-    const hourCounts: number[] = new Array(24).fill(0);
-    visits.forEach((v) => {
-      if (v.date >= ninetyDaysAgo) {
-        hourCounts[v.hour]++;
-      }
-    });
-
-    return hourCounts.map((count, hour) => ({
-      hour,
-      label: formatHour(hour),
-      value: totalDays > 0 ? Math.round((count / totalDays) * 10) / 10 : 0,
-    }));
-  }, [visits, timeZone]);
-
   const totalUnique = visits.length;
 
   // ─── Render ────────────────────────────────────────────────────────────
@@ -544,95 +516,43 @@ export default function DashboardOverview() {
         </div>
       </div>
 
-      {/* AVERAGES — DOW + hourly typical pattern, paired conceptually */}
-      <div className="space-y-6">
-        <div className="font-display text-xs font-bold uppercase tracking-widest text-dash-text-muted">
-          Typical patterns · last 90 days
+      {/* DAY OF WEEK AVERAGES */}
+      <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
+            Avg Check-ins by Day of Week
+          </h3>
         </div>
-
-        {/* DAY OF WEEK AVERAGES */}
-        <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
-              Avg Check-ins by Day of Week
-            </h3>
-          </div>
-          <p className="mb-6 text-xs text-dash-text-muted">
-            Tap a day for hourly breakdown
-          </p>
-          {(() => {
-            const maxAvg = Math.max(...dayOfWeekAvg.map((d) => d.avg), 1);
-            return (
-              <div className="flex items-end gap-3" style={{ height: 180 }}>
-                {dayOfWeekAvg.map((d) => (
-                  <button
-                    key={d.dow}
-                    onClick={() => setSelectedDow(d.dow)}
-                    className="group flex flex-1 flex-col items-center gap-2 transition-transform hover:scale-105"
-                  >
-                    <span className="text-xs font-medium text-teal opacity-0 transition-opacity group-hover:opacity-100">
-                      {d.avg}
-                    </span>
-                    <div
-                      className="w-full rounded-t-lg bg-gradient-to-t from-teal/40 to-teal transition-all"
-                      style={{
-                        height: `${Math.max((d.avg / maxAvg) * 140, 4)}px`,
-                      }}
-                    />
-                    <span className="text-[11px] font-medium text-dash-text-muted group-hover:text-teal">
-                      {d.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* TYPICAL HOURLY PATTERN — 24-hour avg over 90 days */}
-        <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
-              Typical Hourly Pattern
-            </h3>
-          </div>
-          <p className="mb-6 text-xs text-dash-text-muted">
-            Average check-ins per hour across all days
-          </p>
-          <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={typicalHourly}
-                margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  stroke="#777777"
-                  tick={{ fontSize: 10 }}
-                  interval={3}
-                />
-                <YAxis
-                  stroke="#777777"
-                  tick={{ fontSize: 11 }}
-                  allowDecimals
-                  domain={[0, (dataMax: number) => Math.max(dataMax, 1)]}
-                />
-                <Tooltip
-                  cursor={{ fill: "#3ECFB210" }}
-                  contentStyle={{
-                    background: "#1A1A1A",
-                    border: "1px solid #2A2A2A",
-                    borderRadius: 12,
-                    fontSize: 12,
-                  }}
-                  formatter={(v) => [v as number, "avg check-ins"]}
-                />
-                <Bar dataKey="value" fill="#3ECFB2" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <p className="mb-6 text-xs text-dash-text-muted">
+          Last 90 days · tap a day for hourly breakdown
+        </p>
+        {(() => {
+          const maxAvg = Math.max(...dayOfWeekAvg.map((d) => d.avg), 1);
+          return (
+            <div className="flex items-end gap-3" style={{ height: 180 }}>
+              {dayOfWeekAvg.map((d) => (
+                <button
+                  key={d.dow}
+                  onClick={() => setSelectedDow(d.dow)}
+                  className="group flex flex-1 flex-col items-center gap-2 transition-transform hover:scale-105"
+                >
+                  <span className="text-xs font-medium text-teal opacity-0 transition-opacity group-hover:opacity-100">
+                    {d.avg}
+                  </span>
+                  <div
+                    className="w-full rounded-t-lg bg-gradient-to-t from-teal/40 to-teal transition-all"
+                    style={{
+                      height: `${Math.max((d.avg / maxAvg) * 140, 4)}px`,
+                    }}
+                  />
+                  <span className="text-[11px] font-medium text-dash-text-muted group-hover:text-teal">
+                    {d.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* FOLLOWERS CHART */}
