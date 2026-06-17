@@ -17,6 +17,10 @@ export interface Court {
   photoUrlCard: string;
   photoUrlFull: string;
   phoneNumber: string;
+  // IANA timezone (e.g. "America/New_York"), populated by the
+  // `syncCourtTimeZone` Cloud Function from lat/lng. Optional because legacy
+  // court docs may predate that function — callers fall back to a default.
+  timeZone?: string;
   // Operator fields (optional — only present on operator-managed courts)
   operatorIds?: string[];
   verified?: boolean;

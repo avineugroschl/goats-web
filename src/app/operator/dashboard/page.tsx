@@ -24,9 +24,39 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
+import { toZonedTime } from "date-fns-tz";
 import { db } from "@/lib/firebase";
 import { useSelectedCourt } from "@/lib/selected-court";
 import { Court } from "@/lib/types";
+
+// IANA fallback for legacy court docs that predate the syncCourtTimeZone
+// Cloud Function and don't carry a `timeZone` field.
+const FALLBACK_TIME_ZONE = "America/New_York";
+
+// Returns a Date constructed in system-local time but carrying the calendar
+// year/month/day of "now in `tz`". Useful as the anchor for date-walk loops
+// (`d.setDate(d.getDate() - 1)`) where we want to iterate calendar dates in
+// the court's timezone. The Date's `.getFullYear/Month/Date/Day` all return
+// TZ-invariant calendar values once constructed this way, so subsequent
+// `formatDayKey(d)` matches the keys we computed in `loadDashboard` via
+// `toZonedTime`.
+function courtLocalCalendarDate(tz: string, anchor: Date = new Date()): Date {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts: Record<string, string> = {};
+  fmt.formatToParts(anchor).forEach((p) => {
+    parts[p.type] = p.value;
+  });
+  return new Date(
+    parseInt(parts.year, 10),
+    parseInt(parts.month, 10) - 1,
+    parseInt(parts.day, 10)
+  );
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -63,6 +93,9 @@ export default function DashboardOverview() {
 
   const [checkInsRange, setCheckInsRange] = useState<Range>("30d");
   const [selectedDow, setSelectedDow] = useState<number | null>(null);
+  // When a daily bar is tapped, opens the same hourly modal but in
+  // "single day" mode (showing that date's counts, not a DOW average).
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
 
   // ─── Load court + initial data ─────────────────────────────────────────
   useEffect(() => {
@@ -119,10 +152,17 @@ export default function DashboardOverview() {
     setLoading(true);
     try {
       // Pull court doc once for the initial render (the live listener takes
-      // over after this).
+      // over after this). We need the court's `timeZone` here too so visit
+      // dedupe / DOW / hour assignment all happen in the court's local time
+      // rather than the operator's browser locale — otherwise a PST-based
+      // operator viewing an NYC court sees 1am NYC sessions land in the
+      // previous day's column.
       const courtSnap = await getDoc(doc(db, "courts", cId));
+      let courtTimeZone = FALLBACK_TIME_ZONE;
       if (courtSnap.exists()) {
-        setCourt({ id: courtSnap.id, ...courtSnap.data() } as Court);
+        const courtData = { id: courtSnap.id, ...courtSnap.data() } as Court;
+        setCourt(courtData);
+        if (courtData.timeZone) courtTimeZone = courtData.timeZone;
       }
 
       // Pull last 90 days of visits, deduplicate to one earliest check-in per
@@ -145,19 +185,25 @@ export default function DashboardOverview() {
       const visitsSnap = await getDocs(visitsQuery);
 
       // Build unique-per-(user, day) set, taking the earliest check-in.
-      const earliestByKey = new Map<string, { date: Date; userId: string }>();
+      // Day key is computed in the court's timezone via `toZonedTime`, which
+      // returns a Date whose local methods (getFullYear/Month/Date/Day/Hours)
+      // return values for the target TZ. The `date` field on UniqueVisit
+      // stays as the raw UTC instant so cross-day comparisons (`v.date >=
+      // ninetyDaysAgo`) still use real time, not local-time wall clock.
+      const earliestByKey = new Map<string, { date: Date; zoned: Date; userId: string }>();
       visitsSnap.docs.forEach((d) => {
         const data = d.data();
         if (data.hiddenFromActivity === true) return;
         const ts = data.checkInTime as Timestamp | undefined;
         if (!ts) return;
         const date = ts.toDate();
-        const dayKey = formatDayKey(date);
+        const zoned = toZonedTime(date, courtTimeZone);
+        const dayKey = formatDayKey(zoned);
         const userId = data.userId as string;
         const key = `${userId}|${dayKey}`;
         const existing = earliestByKey.get(key);
         if (!existing || date < existing.date) {
-          earliestByKey.set(key, { date, userId });
+          earliestByKey.set(key, { date, zoned, userId });
         }
       });
 
@@ -167,8 +213,8 @@ export default function DashboardOverview() {
           return {
             userId,
             dayKey,
-            hour: val.date.getHours(),
-            dow: val.date.getDay(),
+            hour: val.zoned.getHours(),
+            dow: val.zoned.getDay(),
             date: val.date,
           };
         }
@@ -193,11 +239,15 @@ export default function DashboardOverview() {
 
   // ─── Derived data ──────────────────────────────────────────────────────
 
+  // Court's IANA timezone — falls back to NY for legacy docs without one.
+  // All date/DOW/hour math below uses this so an operator in PST viewing
+  // an NYC court sees data aligned to NY local time, not browser local.
+  const timeZone = court?.timeZone ?? FALLBACK_TIME_ZONE;
+
   // Time series for the selected range
   const timeSeries = useMemo(() => {
     const days = RANGE_DAYS[checkInsRange];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = courtLocalCalendarDate(timeZone);
 
     const points: { dayKey: string; label: string; count: number; date: Date }[] = [];
     const counts = new Map<string, number>();
@@ -218,7 +268,7 @@ export default function DashboardOverview() {
       });
     }
     return points;
-  }, [visits, checkInsRange]);
+  }, [visits, checkInsRange, timeZone]);
 
   // Day-of-week averages over the last 90 days
   const dayOfWeekAvg = useMemo(() => {
@@ -227,12 +277,14 @@ export default function DashboardOverview() {
     const dowCounts = new Array(7).fill(0); // total visits per dow
     const dowOccurrences = new Array(7).fill(0); // how many of that weekday in window
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = courtLocalCalendarDate(timeZone);
     const ninetyDaysAgo = new Date(today);
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 89);
 
-    // Count weekday occurrences in [ninetyDaysAgo, today] inclusive
+    // Count weekday occurrences in [ninetyDaysAgo, today] inclusive.
+    // d.getDay() returns the calendar DOW of the constructed Date, which is
+    // TZ-invariant — equivalent to the court-local DOW since the anchor was
+    // built from court-local year/month/day.
     for (let d = new Date(ninetyDaysAgo); d <= today; d.setDate(d.getDate() + 1)) {
       dowOccurrences[d.getDay()]++;
     }
@@ -252,7 +304,7 @@ export default function DashboardOverview() {
         : 0,
       total: dowCounts[dow],
     }));
-  }, [visits]);
+  }, [visits, timeZone]);
 
   // Hourly breakdown for the popup (selected day-of-week)
   const hourlyForSelectedDow = useMemo(() => {
@@ -269,8 +321,7 @@ export default function DashboardOverview() {
     const hourCounts: Record<number, number> = {};
     let dowOccurrences = 0;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = courtLocalCalendarDate(timeZone);
     const ninetyDaysAgo = new Date(today);
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 89);
 
@@ -295,12 +346,71 @@ export default function DashboardOverview() {
       });
     }
     return data;
-  }, [selectedDow, visits, court?.schedule]);
+  }, [selectedDow, visits, court?.schedule, timeZone]);
 
   const todayCount = useMemo(() => {
-    const todayKey = formatDayKey(new Date());
+    const todayKey = formatDayKey(courtLocalCalendarDate(timeZone));
     return visits.filter((v) => v.dayKey === todayKey).length;
-  }, [visits]);
+  }, [visits, timeZone]);
+
+  // Hourly breakdown for a single specific calendar day (court-local).
+  // Drives the modal when an operator taps a day in the "Daily Check-ins"
+  // bar chart. Values are raw counts, not averages — it's one day.
+  const hourlyForSelectedDay = useMemo(() => {
+    if (selectedDayKey === null) return [];
+    const hourCounts: Record<number, number> = {};
+    visits.forEach((v) => {
+      if (v.dayKey === selectedDayKey) {
+        hourCounts[v.hour] = (hourCounts[v.hour] ?? 0) + 1;
+      }
+    });
+    const data: { hour: number; label: string; value: number }[] = [];
+    for (let h = 0; h < 24; h++) {
+      data.push({ hour: h, label: formatHour(h), value: hourCounts[h] ?? 0 });
+    }
+    return data;
+  }, [selectedDayKey, visits]);
+
+  // Human-friendly label for the selected day, e.g. "Mon, Jun 16" — derived
+  // from the dayKey so it always matches the court-local calendar date the
+  // operator tapped.
+  const selectedDayLabel = useMemo(() => {
+    if (!selectedDayKey) return "";
+    const [y, m, d] = selectedDayKey.split("-").map((s) => parseInt(s, 10));
+    return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  }, [selectedDayKey]);
+
+  // Typical hourly pattern averaged over the last 90 days (court-local).
+  // Each cell = total check-ins that hour over 90 days / 90 day count.
+  // Mirrors the in-app Popular Times chart but stays on `courtVisits` data
+  // so it survives account-deletion the same way the other charts do.
+  const typicalHourly = useMemo(() => {
+    const today = courtLocalCalendarDate(timeZone);
+    const ninetyDaysAgo = new Date(today);
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 89);
+
+    let totalDays = 0;
+    for (let d = new Date(ninetyDaysAgo); d <= today; d.setDate(d.getDate() + 1)) {
+      totalDays++;
+    }
+
+    const hourCounts: number[] = new Array(24).fill(0);
+    visits.forEach((v) => {
+      if (v.date >= ninetyDaysAgo) {
+        hourCounts[v.hour]++;
+      }
+    });
+
+    return hourCounts.map((count, hour) => ({
+      hour,
+      label: formatHour(hour),
+      value: totalDays > 0 ? Math.round((count / totalDays) * 10) / 10 : 0,
+    }));
+  }, [visits, timeZone]);
 
   const totalUnique = visits.length;
 
@@ -380,18 +490,21 @@ export default function DashboardOverview() {
         <StatCard label="Peer Ratings" value={totalRatings} sub="given at this court" />
       </div>
 
-      {/* CHECK-INS TIME SERIES */}
+      {/* DAILY CHECK-INS — bar per day, tap to drill into that day's hours */}
       <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
-            Unique Check-ins Over Time
+            Unique Check-ins per Day
           </h3>
           <RangeToggle value={checkInsRange} onChange={setCheckInsRange} />
         </div>
+        <p className="mb-6 text-xs text-dash-text-muted">
+          Tap a day for hourly breakdown
+        </p>
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={timeSeries} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
+            <BarChart data={timeSeries} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" vertical={false} />
               <XAxis
                 dataKey="label"
                 stroke="#777777"
@@ -402,8 +515,10 @@ export default function DashboardOverview() {
                 stroke="#777777"
                 tick={{ fontSize: 11 }}
                 allowDecimals={false}
+                domain={[0, (dataMax: number) => Math.max(dataMax, 1)]}
               />
               <Tooltip
+                cursor={{ fill: "#3ECFB210" }}
                 contentStyle={{
                   background: "#1A1A1A",
                   border: "1px solid #2A2A2A",
@@ -414,67 +529,132 @@ export default function DashboardOverview() {
                 itemStyle={{ color: "#3ECFB2" }}
                 formatter={(v) => [v as number, "check-ins"]}
               />
-              <Line
-                type="monotone"
+              <Bar
                 dataKey="count"
-                stroke="#3ECFB2"
-                strokeWidth={2}
-                dot={{ fill: "#3ECFB2", r: 3 }}
-                activeDot={{ r: 5 }}
+                fill="#3ECFB2"
+                radius={[6, 6, 0, 0]}
+                cursor="pointer"
+                onClick={(payload: unknown) => {
+                  const p = payload as { dayKey?: string } | undefined;
+                  if (p?.dayKey) setSelectedDayKey(p.dayKey);
+                }}
               />
-            </LineChart>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* DAY OF WEEK AVERAGES */}
-      <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
-            Avg Check-ins by Day of Week
-          </h3>
+      {/* AVERAGES — DOW + hourly typical pattern, paired conceptually */}
+      <div className="space-y-6">
+        <div className="font-display text-xs font-bold uppercase tracking-widest text-dash-text-muted">
+          Typical patterns · last 90 days
         </div>
-        <p className="mb-6 text-xs text-dash-text-muted">
-          Last 90 days · tap a day for hourly breakdown
-        </p>
-        {(() => {
-          const maxAvg = Math.max(...dayOfWeekAvg.map((d) => d.avg), 1);
-          return (
-            <div className="flex items-end gap-3" style={{ height: 180 }}>
-              {dayOfWeekAvg.map((d) => (
-                <button
-                  key={d.dow}
-                  onClick={() => setSelectedDow(d.dow)}
-                  className="group flex flex-1 flex-col items-center gap-2 transition-transform hover:scale-105"
-                >
-                  <span className="text-xs font-medium text-teal opacity-0 transition-opacity group-hover:opacity-100">
-                    {d.avg}
-                  </span>
-                  <div
-                    className="w-full rounded-t-lg bg-gradient-to-t from-teal/40 to-teal transition-all"
-                    style={{
-                      height: `${Math.max((d.avg / maxAvg) * 140, 4)}px`,
-                    }}
-                  />
-                  <span className="text-[11px] font-medium text-dash-text-muted group-hover:text-teal">
-                    {d.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          );
-        })()}
+
+        {/* DAY OF WEEK AVERAGES */}
+        <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
+              Avg Check-ins by Day of Week
+            </h3>
+          </div>
+          <p className="mb-6 text-xs text-dash-text-muted">
+            Tap a day for hourly breakdown
+          </p>
+          {(() => {
+            const maxAvg = Math.max(...dayOfWeekAvg.map((d) => d.avg), 1);
+            return (
+              <div className="flex items-end gap-3" style={{ height: 180 }}>
+                {dayOfWeekAvg.map((d) => (
+                  <button
+                    key={d.dow}
+                    onClick={() => setSelectedDow(d.dow)}
+                    className="group flex flex-1 flex-col items-center gap-2 transition-transform hover:scale-105"
+                  >
+                    <span className="text-xs font-medium text-teal opacity-0 transition-opacity group-hover:opacity-100">
+                      {d.avg}
+                    </span>
+                    <div
+                      className="w-full rounded-t-lg bg-gradient-to-t from-teal/40 to-teal transition-all"
+                      style={{
+                        height: `${Math.max((d.avg / maxAvg) * 140, 4)}px`,
+                      }}
+                    />
+                    <span className="text-[11px] font-medium text-dash-text-muted group-hover:text-teal">
+                      {d.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* TYPICAL HOURLY PATTERN — 24-hour avg over 90 days */}
+        <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="font-display text-sm font-bold uppercase tracking-widest text-white/40">
+              Typical Hourly Pattern
+            </h3>
+          </div>
+          <p className="mb-6 text-xs text-dash-text-muted">
+            Average check-ins per hour across all days
+          </p>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={typicalHourly}
+                margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  stroke="#777777"
+                  tick={{ fontSize: 10 }}
+                  interval={3}
+                />
+                <YAxis
+                  stroke="#777777"
+                  tick={{ fontSize: 11 }}
+                  allowDecimals
+                  domain={[0, (dataMax: number) => Math.max(dataMax, 1)]}
+                />
+                <Tooltip
+                  cursor={{ fill: "#3ECFB210" }}
+                  contentStyle={{
+                    background: "#1A1A1A",
+                    border: "1px solid #2A2A2A",
+                    borderRadius: 12,
+                    fontSize: 12,
+                  }}
+                  formatter={(v) => [v as number, "avg check-ins"]}
+                />
+                <Bar dataKey="value" fill="#3ECFB2" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
       {/* FOLLOWERS CHART */}
       <FollowersChart courtId={courtId} />
 
-      {/* HOURLY BREAKDOWN MODAL */}
+      {/* HOURLY BREAKDOWN MODAL — drilldown from either a DOW or a date bar */}
       {selectedDow !== null && (
         <HourlyModal
-          dowLabel={DOW_LABELS[selectedDow]}
-          data={hourlyForSelectedDow}
+          title={`${DOW_LABELS[selectedDow]} — Hourly`}
+          subtitle="Average unique check-ins per hour during operating hours"
+          emptyMessage={`No check-ins recorded on ${DOW_LABELS[selectedDow]}s yet`}
+          data={hourlyForSelectedDow.map((d) => ({ ...d, value: d.avg }))}
           onClose={() => setSelectedDow(null)}
+        />
+      )}
+      {selectedDayKey !== null && (
+        <HourlyModal
+          title={selectedDayLabel}
+          subtitle="Unique check-ins per hour"
+          emptyMessage="No check-ins recorded for this day"
+          data={hourlyForSelectedDay}
+          onClose={() => setSelectedDayKey(null)}
         />
       )}
     </div>
@@ -545,14 +725,19 @@ function ActiveUserAvatar({ user }: { user: ActiveUserProfile }) {
 }
 
 function HourlyModal({
-  dowLabel,
+  title,
+  subtitle,
+  emptyMessage,
   data,
   onClose,
 }: {
-  dowLabel: string;
-  data: { hour: number; label: string; avg: number }[];
+  title: string;
+  subtitle: string;
+  emptyMessage: string;
+  data: { hour: number; label: string; value: number }[];
   onClose: () => void;
 }) {
+  const allZero = data.length > 0 && data.every((d) => d.value === 0);
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
@@ -564,10 +749,8 @@ function HourlyModal({
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="font-display text-lg font-bold text-white">{dowLabel} — Hourly</h3>
-            <p className="text-xs text-dash-text-muted">
-              Average unique check-ins per hour during operating hours
-            </p>
+            <h3 className="font-display text-lg font-bold text-white">{title}</h3>
+            <p className="text-xs text-dash-text-muted">{subtitle}</p>
           </div>
           <button
             onClick={onClose}
@@ -581,14 +764,14 @@ function HourlyModal({
           <div className="py-12 text-center text-sm text-white/30">
             No operating hours set for this day. Set them under My Court → Schedule.
           </div>
-        ) : data.every((d) => d.avg === 0) ? (
+        ) : allZero ? (
           <div className="rounded-xl border border-dash-border bg-dash-bg py-12 text-center">
             <p className="font-display text-sm font-bold text-white/40">
-              No check-ins recorded on {dowLabel}s yet
+              {emptyMessage}
             </p>
             <p className="mt-2 text-xs text-white/30">
               Showing hours {data[0].label} – {data[data.length - 1].label}.
-              Once players start checking in, you&apos;ll see the hourly distribution here.
+              Once players check in, you&apos;ll see the hourly distribution here.
             </p>
           </div>
         ) : (
@@ -611,9 +794,9 @@ function HourlyModal({
                     borderRadius: 12,
                     fontSize: 12,
                   }}
-                  formatter={(v) => [v as number, "avg check-ins"]}
+                  formatter={(v) => [v as number, "check-ins"]}
                 />
-                <Bar dataKey="avg" fill="#3ECFB2" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="value" fill="#3ECFB2" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

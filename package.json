@@ -10,6 +10,7 @@
     "generate-qr": "node scripts/generate-qr.mjs"
   },
   "dependencies": {
+    "date-fns-tz": "^3.2.0",
     "disposable-email-domains": "^1.0.62",
     "firebase": "^11.6.0",
     "mailcheck": "^1.1.1",
