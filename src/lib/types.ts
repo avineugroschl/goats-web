@@ -164,6 +164,11 @@ export interface OperatorProfile {
   firstName?: string;
   lastName?: string;
   isAdmin: boolean;
+  // Narrow role: can create/edit live courts and approve pending court
+  // submissions, but cannot see operator applications, the dashboard,
+  // or ambassadors. Granted manually via the Firebase console
+  // (users/{uid}.canEditCourts = true). Admins implicitly have this.
+  canEditCourts: boolean;
   isOperator: boolean;
   operatorCourtIds?: string[];
   subscriptionStatus?: "active" | "past_due" | "cancelled" | "cancelling" | "none";

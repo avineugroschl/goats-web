@@ -16,7 +16,7 @@ export default function AdminNewCourtPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!authLoading && (!user || !profile?.isAdmin)) {
+    if (!authLoading && (!user || !(profile?.isAdmin || profile?.canEditCourts))) {
       router.push("/");
     }
   }, [authLoading, user, profile, router]);
@@ -29,7 +29,7 @@ export default function AdminNewCourtPage() {
     []
   );
 
-  if (authLoading || !user || !profile?.isAdmin) {
+  if (authLoading || !user || !(profile?.isAdmin || profile?.canEditCourts)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-dash-bg">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />

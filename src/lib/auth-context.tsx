@@ -35,6 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const userSnap = await getDoc(doc(db, "users", uid));
     const isAdmin = userSnap.exists() ? Boolean(userSnap.data().isAdmin) : false;
+    // Admins implicitly get the canEditCourts capability; otherwise honor the
+    // explicit field on the user doc.
+    const canEditCourts =
+      isAdmin || (userSnap.exists() ? Boolean(userSnap.data().canEditCourts) : false);
 
     operatorUnsubRef.current = onSnapshot(
       doc(db, "operators", uid),
@@ -48,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             firstName: data.firstName ?? "",
             lastName: data.lastName ?? "",
             isAdmin,
+            canEditCourts,
             isOperator: true,
             operatorCourtIds: data.operatorCourtIds ?? [],
             subscriptionStatus: data.subscriptionStatus ?? "none",
@@ -59,15 +64,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Not an operator — fall back to a minimal admin-only profile
-        // so `/admin` still works for platform admins without operator records.
-        if (isAdmin && userSnap.exists()) {
+        // Not an operator — fall back to a minimal profile so /admin still
+        // works for platform admins and court editors without operator records.
+        if ((isAdmin || canEditCourts) && userSnap.exists()) {
           const data = userSnap.data();
           setProfile({
             id: userSnap.id,
             email: data.email ?? "",
             username: data.username ?? "",
-            isAdmin: true,
+            isAdmin,
+            canEditCourts,
             isOperator: false,
             operatorCourtIds: [],
             subscriptionStatus: "none",

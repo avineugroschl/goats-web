@@ -23,14 +23,16 @@ export default function AdminEditCourtPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  useEffect(() => {
-    if (!authLoading && (!user || !profile?.isAdmin)) {
-      router.push("/");
-    }
-  }, [authLoading, user, profile, router]);
+  const canEdit = Boolean(profile?.isAdmin || profile?.canEditCourts);
 
   useEffect(() => {
-    if (!courtId || authLoading || !profile?.isAdmin) return;
+    if (!authLoading && (!user || !canEdit)) {
+      router.push("/");
+    }
+  }, [authLoading, user, canEdit, router]);
+
+  useEffect(() => {
+    if (!courtId || authLoading || !canEdit) return;
     let cancelled = false;
     (async () => {
       try {
@@ -48,9 +50,9 @@ export default function AdminEditCourtPage() {
     return () => {
       cancelled = true;
     };
-  }, [courtId, authLoading, profile?.isAdmin]);
+  }, [courtId, authLoading, canEdit]);
 
-  if (authLoading || loading || !user || !profile?.isAdmin) {
+  if (authLoading || loading || !user || !canEdit) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-dash-bg">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />

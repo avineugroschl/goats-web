@@ -35,24 +35,38 @@ type DashTab = "comments" | "users" | "profilePics" | "checkIns" | "ratings" | "
 export default function AdminReviewPanel() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<AdminTab>("applications");
+  // Court editors (canEditCourts but not isAdmin) only see the two courts
+  // tabs — default them to "courts" since "applications" is hidden.
+  const isAdmin = Boolean(profile?.isAdmin);
+  const isCourtsOnly = Boolean(profile?.canEditCourts) && !isAdmin;
+  const [activeTab, setActiveTab] = useState<AdminTab>(
+    isCourtsOnly ? "courts" : "applications"
+  );
 
   useEffect(() => {
-    if (!authLoading && (!user || !profile?.isAdmin)) {
+    if (!authLoading && (!user || (!profile?.isAdmin && !profile?.canEditCourts))) {
       router.push("/");
     }
   }, [authLoading, user, profile, router]);
 
   // Honor ?tab=... on first mount so the form pages can navigate back to a
   // specific tab. Read once from window.location to avoid the Suspense
-  // requirement of Next.js 15's useSearchParams hook.
+  // requirement of Next.js 15's useSearchParams hook. Also snaps a courts-only
+  // editor to "courts" if the currently-selected tab isn't allowed (happens
+  // when the profile loads after first render and the default `applications`
+  // is no longer visible to them).
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const allowed: AdminTab[] = isCourtsOnly
+      ? ["courts", "liveCourts"]
+      : ["applications", "courts", "liveCourts", "dashboard", "ambassadors"];
     const tab = new URLSearchParams(window.location.search).get("tab");
-    if (tab === "applications" || tab === "courts" || tab === "liveCourts" || tab === "dashboard" || tab === "ambassadors") {
-      setActiveTab(tab);
+    if (allowed.includes(tab as AdminTab)) {
+      setActiveTab(tab as AdminTab);
+    } else {
+      setActiveTab((prev) => (allowed.includes(prev) ? prev : allowed[0]));
     }
-  }, []);
+  }, [isCourtsOnly]);
 
   if (authLoading) {
     return (
@@ -72,7 +86,7 @@ export default function AdminReviewPanel() {
             <span className="font-display text-sm font-bold text-white">G.O.A.T.S</span>
           </Link>
           <span className="rounded bg-coral/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-coral">
-            Admin
+            {isCourtsOnly ? "Courts Editor" : "Admin"}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -118,7 +132,7 @@ export default function AdminReviewPanel() {
             { id: "liveCourts" as const, label: "All Courts" },
             { id: "ambassadors" as const, label: "Ambassadors" },
             { id: "dashboard" as const, label: "Dashboard" },
-          ]).map((tab) => (
+          ]).filter((tab) => !isCourtsOnly || tab.id === "courts" || tab.id === "liveCourts").map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -135,11 +149,11 @@ export default function AdminReviewPanel() {
       </div>
 
       <div className="mx-auto max-w-5xl px-6 py-8 sm:px-12">
-        {activeTab === "applications" && <ApplicationsTab />}
+        {activeTab === "applications" && !isCourtsOnly && <ApplicationsTab />}
         {activeTab === "courts" && <PendingCourtsTab />}
         {activeTab === "liveCourts" && <LiveCourtsTab />}
-        {activeTab === "ambassadors" && <AmbassadorsTab />}
-        {activeTab === "dashboard" && <DashboardTab />}
+        {activeTab === "ambassadors" && !isCourtsOnly && <AmbassadorsTab />}
+        {activeTab === "dashboard" && !isCourtsOnly && <DashboardTab />}
       </div>
     </main>
   );
