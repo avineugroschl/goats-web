@@ -20,14 +20,14 @@ export default function OperatorLanding() {
 
   // Auto-redirect already-signed-in users to wherever they belong:
   //  - operators → dashboard
-  //  - pure platform admins → /admin
+  //  - platform admins / court editors → /admin
   //  - anyone else → stay on this page (they shouldn't be here)
   useEffect(() => {
     if (loading) return;
     if (!user || !profile) return;
     if (profile.isOperator) {
       router.push("/operator/dashboard");
-    } else if (profile.isAdmin) {
+    } else if (profile.isAdmin || profile.canEditCourts) {
       router.push("/admin");
     }
   }, [loading, user, profile, router]);
@@ -41,16 +41,19 @@ export default function OperatorLanding() {
       const uid = credential.user.uid;
 
       // Gate access: this account must either have an operator record
-      // (operators/{uid}) or be a platform admin (users/{uid}.isAdmin).
-      // Regular player accounts from the mobile app should be rejected.
+      // (operators/{uid}), be a platform admin (users/{uid}.isAdmin), or be a
+      // court editor (users/{uid}.canEditCourts). Regular player accounts from
+      // the mobile app should be rejected.
       const [operatorSnap, userSnap] = await Promise.all([
         getDoc(doc(db, "operators", uid)),
         getDoc(doc(db, "users", uid)),
       ]);
       const isOperator = operatorSnap.exists();
       const isAdmin = userSnap.exists() && Boolean(userSnap.data().isAdmin);
+      const canEditCourts =
+        isAdmin || (userSnap.exists() && Boolean(userSnap.data().canEditCourts));
 
-      if (!isOperator && !isAdmin) {
+      if (!isOperator && !isAdmin && !canEditCourts) {
         await signOut(auth);
         setError(
           "This account isn't set up as a court operator. Sign up below to get started."
