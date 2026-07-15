@@ -9,7 +9,7 @@ import {
   getCourtByLegacyId,
 } from "@/lib/courts-data";
 
-const SITE = "https://goatssportsapp.com";
+const SITE = "https://www.goatssportsapp.com";
 
 // Statically prerender every court at build; regenerate each page ~daily and
 // render newly-added courts on first request (then cache) via dynamicParams.

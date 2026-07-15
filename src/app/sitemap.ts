@@ -2,7 +2,7 @@ import { MetadataRoute } from "next";
 import { getAllCourtsForStatic } from "@/lib/courts-data";
 import { courtPath } from "@/lib/slug";
 
-const SITE = "https://goatssportsapp.com";
+const SITE = "https://www.goatssportsapp.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const courts = await getAllCourtsForStatic();

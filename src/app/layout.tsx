@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://goatssportsapp.com"),
+  metadataBase: new URL("https://www.goatssportsapp.com"),
   title: {
     default: "G.O.A.T.S - Find Pickup Basketball Courts Near You",
     template: "%s | G.O.A.T.S - Pickup Basketball App",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://goatssportsapp.com",
+    url: "https://www.goatssportsapp.com",
     siteName: "G.O.A.T.S - Pickup Basketball",
     title: "G.O.A.T.S - Find Pickup Basketball Courts Near You",
     description:
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     follow: true,
   },
   alternates: {
-    canonical: "https://goatssportsapp.com",
+    canonical: "https://www.goatssportsapp.com",
   },
 };
 
@@ -65,7 +65,7 @@ const jsonLd = {
   operatingSystem: "iOS, Android",
   description:
     "Find pickup basketball courts near you, see who's playing in real time, check in, and rate other players. The ultimate pickup basketball app.",
-  url: "https://goatssportsapp.com",
+  url: "https://www.goatssportsapp.com",
   offers: {
     "@type": "Offer",
     price: "0",
