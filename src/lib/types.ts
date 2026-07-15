@@ -5,6 +5,14 @@ export interface Court {
   // import + graduation scripts. Optional — legacy docs may predate it, so
   // callers fall back to `id` (see courtPath in lib/slug.ts).
   slug?: string;
+  // Reverse-geocoded location, stamped by backfill-court-geo.js. Drives the
+  // /basketball-courts/{locationSlug} hub pages. geoCity is the borough for
+  // NYC (e.g. "Manhattan"). locationSlug = "{city}-{st}" e.g. "manhattan-ny".
+  geoCity?: string;
+  geoStateName?: string;
+  geoState?: string;
+  geoNeighborhood?: string;
+  locationSlug?: string;
   name: string;
   address: string;
   baskets: number;

@@ -9,6 +9,9 @@ export default function Footer() {
 
           {/* Links */}
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm">
+            <Link href="/basketball-courts" className="text-white/40 transition-colors hover:text-white/70">
+              Basketball Courts
+            </Link>
             <Link href="/privacy" className="text-white/40 transition-colors hover:text-white/70">
               Privacy Policy
             </Link>

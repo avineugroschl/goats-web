@@ -76,3 +76,48 @@ export async function getCourtByLegacyId(id: string): Promise<Court | null> {
   }
   return null;
 }
+
+// A city/borough grouping of courts, backing the /basketball-courts hub pages.
+export interface LocationGroup {
+  locationSlug: string;
+  city: string; // borough for NYC, e.g. "Manhattan"
+  stateName: string; // e.g. "New York"
+  state: string; // 2-letter, e.g. "NY"
+  courts: Court[];
+}
+
+// Group all geocoded courts by locationSlug. Courts without geo data are
+// omitted (they still have their own /courts/{slug} page). Groups sorted by
+// court count desc; courts within a group sorted by name.
+export async function getLocationGroups(): Promise<LocationGroup[]> {
+  const courts = await getAllCourtsForStatic();
+  const map = new Map<string, LocationGroup>();
+  for (const c of courts) {
+    if (!c.locationSlug || !c.geoCity || !c.geoState) continue;
+    let g = map.get(c.locationSlug);
+    if (!g) {
+      g = {
+        locationSlug: c.locationSlug,
+        city: c.geoCity,
+        stateName: c.geoStateName || c.geoState,
+        state: c.geoState,
+        courts: [],
+      };
+      map.set(c.locationSlug, g);
+    }
+    g.courts.push(c);
+  }
+  const groups = [...map.values()];
+  for (const g of groups) g.courts.sort((a, b) => a.name.localeCompare(b.name));
+  groups.sort(
+    (a, b) => b.courts.length - a.courts.length || a.city.localeCompare(b.city)
+  );
+  return groups;
+}
+
+export async function getLocationBySlug(
+  locationSlug: string
+): Promise<LocationGroup | null> {
+  const groups = await getLocationGroups();
+  return groups.find((g) => g.locationSlug === locationSlug) || null;
+}

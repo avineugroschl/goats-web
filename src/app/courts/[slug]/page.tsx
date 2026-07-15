@@ -64,7 +64,8 @@ export async function generateMetadata({
   const canonical = `${SITE}${courtPath(court)}`;
   const description = metaDescription(court);
   const image = heroImageOf(court);
-  const ogTitle = `${court.name} — Basketball Court`;
+  const area = court.geoCity ? ` in ${court.geoCity}` : "";
+  const ogTitle = `${court.name} — Basketball Court${area}`;
 
   return {
     title: { absolute: `${ogTitle} | G.O.A.T.S` },
@@ -91,8 +92,7 @@ function buildJsonLd(court: Court) {
   const hasGeo = court.latitude !== 0 && court.longitude !== 0;
   const image = heroImageOf(court);
 
-  const data: Record<string, unknown> = {
-    "@context": "https://schema.org",
+  const place: Record<string, unknown> = {
     "@type": "SportsActivityLocation",
     "@id": canonical,
     name: court.name,
@@ -100,23 +100,55 @@ function buildJsonLd(court: Court) {
     description: metaDescription(court),
     sport: "Basketball",
   };
-  if (image) data.image = image;
+  if (image) place.image = image;
   if (court.address) {
-    data.address = {
+    place.address = {
       "@type": "PostalAddress",
       streetAddress: court.address,
+      ...(court.geoCity ? { addressLocality: court.geoCity } : {}),
+      ...(court.geoState ? { addressRegion: court.geoState } : {}),
       addressCountry: "US",
     };
   }
   if (hasGeo) {
-    data.geo = {
+    place.geo = {
       "@type": "GeoCoordinates",
       latitude: court.latitude,
       longitude: court.longitude,
     };
   }
-  if (court.phoneNumber) data.telephone = court.phoneNumber;
-  return data;
+  if (court.phoneNumber) place.telephone = court.phoneNumber;
+
+  // Add a breadcrumb (Basketball Courts › City › Court) when the court is
+  // geocoded, tying the page into its hub.
+  if (court.locationSlug && court.geoCity && court.geoState) {
+    const breadcrumb = {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Basketball Courts",
+          item: `${SITE}/basketball-courts`,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: `${court.geoCity}, ${court.geoState}`,
+          item: `${SITE}/basketball-courts/${court.locationSlug}`,
+        },
+        {
+          "@type": "ListItem",
+          position: 3,
+          name: court.name,
+          item: canonical,
+        },
+      ],
+    };
+    return { "@context": "https://schema.org", "@graph": [place, breadcrumb] };
+  }
+
+  return { "@context": "https://schema.org", ...place };
 }
 
 export default async function CourtDetailsPage({
@@ -138,14 +170,31 @@ export default async function CourtDetailsPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(buildJsonLd(court)) }}
       />
 
-      {/* Back link */}
-      <Link
-        href="/courts"
-        className="mb-6 inline-flex items-center gap-2 text-teal hover:text-teal-dark"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-        Back to courts
-      </Link>
+      {/* Breadcrumb (or back link if the court isn't geocoded) */}
+      {court.locationSlug && court.geoCity && court.geoState ? (
+        <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-text-muted">
+          <Link href="/basketball-courts" className="text-teal hover:text-teal-dark">
+            Basketball Courts
+          </Link>
+          <span>/</span>
+          <Link
+            href={`/basketball-courts/${court.locationSlug}`}
+            className="text-teal hover:text-teal-dark"
+          >
+            {court.geoCity}, {court.geoState}
+          </Link>
+          <span>/</span>
+          <span className="truncate text-text-secondary">{court.name}</span>
+        </nav>
+      ) : (
+        <Link
+          href="/courts"
+          className="mb-6 inline-flex items-center gap-2 text-teal hover:text-teal-dark"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          Back to courts
+        </Link>
+      )}
 
       {/* Hero Image */}
       {heroImage && (
