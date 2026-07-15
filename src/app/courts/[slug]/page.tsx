@@ -1,52 +1,143 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { Court } from "@/lib/types";
+import type { Metadata } from "next";
+import { permanentRedirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { Court } from "@/lib/types";
+import { courtPath } from "@/lib/slug";
+import {
+  getAllCourtsForStatic,
+  getCourtBySlug,
+  getCourtByLegacyId,
+} from "@/lib/courts-data";
 
-export default function CourtDetailsPage() {
-  const params = useParams();
-  const id = params.id as string;
-  const [court, setCourt] = useState<Court | null>(null);
-  const [loading, setLoading] = useState(true);
+const SITE = "https://goatssportsapp.com";
 
-  useEffect(() => {
-    async function fetchCourt() {
-      const snap = await getDoc(doc(db, "courts", id));
-      if (snap.exists()) {
-        setCourt({ id: snap.id, ...snap.data() } as Court);
-      }
-      setLoading(false);
-    }
-    fetchCourt();
-  }, [id]);
+// Statically prerender every court at build; regenerate each page ~daily and
+// render newly-added courts on first request (then cache) via dynamicParams.
+export const revalidate = 86400;
+export const dynamicParams = true;
 
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-      </main>
-    );
+export async function generateStaticParams() {
+  const courts = await getAllCourtsForStatic();
+  return courts.map((c) => ({ slug: c.slug || c.id }));
+}
+
+function heroImageOf(court: Court): string | undefined {
+  return court.photoUrlFull || court.photoUrlCard || court.photoUrl || undefined;
+}
+
+function metaDescription(court: Court): string {
+  const take = (court.goatsTake || "").trim();
+  if (take) {
+    return take.length > 155
+      ? take.slice(0, 152).replace(/\s+\S*$/, "") + "…"
+      : take;
   }
+  const where = court.address ? ` at ${court.address}` : "";
+  return `${court.name} — pickup basketball court${where}. Baskets, hours, condition, 3-point line and who's playing, on G.O.A.T.S.`.slice(
+    0,
+    160
+  );
+}
 
-  if (!court) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <p className="text-text-muted">Court not found.</p>
-        <Link href="/courts" className="text-teal hover:text-teal-dark">
-          &larr; Back to courts
-        </Link>
-      </main>
-    );
+// Resolve the court for a given URL param. Returns the court, or triggers a
+// 301 redirect from a legacy /courts/{id} URL to the canonical slug URL.
+async function resolveCourt(slug: string): Promise<Court | null> {
+  const bySlug = await getCourtBySlug(slug);
+  if (bySlug) return bySlug;
+  const legacy = await getCourtByLegacyId(slug);
+  if (legacy?.slug && legacy.slug !== slug) {
+    permanentRedirect(courtPath(legacy)); // old id URL → slug URL (301)
   }
+  return legacy; // no slug yet (pre-backfill) — render at the id URL
+}
 
-  const heroImage = court.photoUrlFull || court.photoUrlCard || court.photoUrl;
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const court =
+    (await getCourtBySlug(slug)) ?? (await getCourtByLegacyId(slug));
+  if (!court) return { title: "Court not found" };
+
+  const canonical = `${SITE}${courtPath(court)}`;
+  const description = metaDescription(court);
+  const image = heroImageOf(court);
+  const ogTitle = `${court.name} — Basketball Court`;
+
+  return {
+    title: { absolute: `${ogTitle} | G.O.A.T.S` },
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title: ogTitle,
+      description,
+      url: canonical,
+      type: "website",
+      images: image ? [image] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: ogTitle,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
+}
+
+function buildJsonLd(court: Court) {
+  const canonical = `${SITE}${courtPath(court)}`;
+  const hasGeo = court.latitude !== 0 && court.longitude !== 0;
+  const image = heroImageOf(court);
+
+  const data: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "SportsActivityLocation",
+    "@id": canonical,
+    name: court.name,
+    url: canonical,
+    description: metaDescription(court),
+    sport: "Basketball",
+  };
+  if (image) data.image = image;
+  if (court.address) {
+    data.address = {
+      "@type": "PostalAddress",
+      streetAddress: court.address,
+      addressCountry: "US",
+    };
+  }
+  if (hasGeo) {
+    data.geo = {
+      "@type": "GeoCoordinates",
+      latitude: court.latitude,
+      longitude: court.longitude,
+    };
+  }
+  if (court.phoneNumber) data.telephone = court.phoneNumber;
+  return data;
+}
+
+export default async function CourtDetailsPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const court = await resolveCourt(slug);
+  if (!court) notFound();
+
+  const heroImage = heroImageOf(court);
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-4 py-8">
+      {/* Structured data for search engines */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildJsonLd(court)) }}
+      />
+
       {/* Back link */}
       <Link
         href="/courts"
@@ -59,6 +150,7 @@ export default function CourtDetailsPage() {
       {/* Hero Image */}
       {heroImage && (
         <div className="mb-6 overflow-hidden rounded-2xl shadow-lg">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={heroImage}
             alt={court.name}
@@ -68,7 +160,7 @@ export default function CourtDetailsPage() {
         </div>
       )}
 
-      {/* Court Name & Active Users */}
+      {/* Court Name & Address */}
       <div className="mb-6">
         <h1 className="mb-2 text-3xl font-bold">{court.name}</h1>
         <p className="text-teal">{court.address}</p>
@@ -76,6 +168,7 @@ export default function CourtDetailsPage() {
 
       {/* Get the app CTA */}
       <div className="mb-8 flex items-center gap-4 rounded-2xl bg-teal-light p-5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/app-icon.png" alt="G.O.A.T.S" className="h-12 w-12 rounded-xl" />
         <div>
           <p className="font-semibold text-teal-dark">

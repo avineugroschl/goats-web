@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Court } from "@/lib/types";
+import { courtPath } from "@/lib/slug";
 import Link from "next/link";
 
 const NYC = { lat: 40.7128, lng: -73.9060 };
@@ -423,7 +424,7 @@ function CourtCard({
 
   return (
     <Link
-      href={`/courts/${court.id}`}
+      href={courtPath(court)}
       className="flex gap-4 rounded-2xl bg-surface p-3 shadow-sm transition-shadow hover:shadow-md"
     >
       {/* Thumbnail */}

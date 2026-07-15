@@ -1,5 +1,10 @@
 export interface Court {
   id: string;
+  // URL slug (kebab-case of name, deduped for uniqueness). Stamped by
+  // ~/tools/court-scraper/backfill-court-slugs.js; maintained by the bulk
+  // import + graduation scripts. Optional — legacy docs may predate it, so
+  // callers fall back to `id` (see courtPath in lib/slug.ts).
+  slug?: string;
   name: string;
   address: string;
   baskets: number;
