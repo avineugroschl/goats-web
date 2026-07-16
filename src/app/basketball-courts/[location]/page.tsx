@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import BackButton from "@/components/BackButton";
+import GetAppCta from "@/components/GetAppCta";
 import { courtPath } from "@/lib/slug";
 import {
   getLocationGroups,
@@ -129,24 +130,7 @@ export default async function LocationHubPage({
       </p>
 
       {/* Get the app CTA */}
-      <div className="mb-8 flex flex-col gap-4 rounded-2xl bg-teal-light p-5 sm:flex-row sm:items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/app-icon.png" alt="G.O.A.T.S" className="h-12 w-12 flex-shrink-0 rounded-xl" />
-        <div className="flex-1">
-          <p className="font-semibold text-teal-dark">
-            See who&apos;s playing and much more
-          </p>
-          <p className="text-sm text-text-secondary">
-            Download the app and never miss the action
-          </p>
-        </div>
-        <Link
-          href="/"
-          className="flex-shrink-0 rounded-full bg-coral px-6 py-3 text-center font-semibold text-text-on-dark transition-colors hover:bg-coral-dark"
-        >
-          Get the G.O.A.T.S App
-        </Link>
-      </div>
+      <GetAppCta className="mb-8" />
 
       <div className="flex flex-col gap-3">
         {g.courts.map((court) => {

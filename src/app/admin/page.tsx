@@ -26,7 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 import { OperatorApplication, NewCourtData } from "@/lib/types";
 
 type AdminTab = "applications" | "courts" | "liveCourts" | "dashboard" | "ambassadors";
-type DashTab = "comments" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators";
+type DashTab = "comments" | "feedback" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN ADMIN PAGE
@@ -733,6 +733,7 @@ function DashboardTab() {
       <div className="mb-6 flex flex-wrap gap-1 rounded-xl bg-dash-surface p-1">
         {([
           { id: "comments" as const, label: "Comments" },
+          { id: "feedback" as const, label: "Feedback" },
           { id: "users" as const, label: "Users" },
           { id: "profilePics" as const, label: "Profile Pics" },
           { id: "checkIns" as const, label: "Check-Ins" },
@@ -749,6 +750,7 @@ function DashboardTab() {
       </div>
 
       {dashTab === "comments" && <CommentsPanel />}
+      {dashTab === "feedback" && <FeedbackPanel />}
       {dashTab === "users" && <UsersPanel />}
       {dashTab === "profilePics" && <ProfilePicsPanel />}
       {dashTab === "checkIns" && <CheckInsPanel />}
@@ -808,6 +810,101 @@ function CommentsPanel() {
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Website "Edits, thoughts, or comments?" submissions from court pages.
+// Newest first; mark resolved (kept for the record) or delete outright.
+function FeedbackPanel() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const snap = await getDocs(
+        query(collection(db, "court_feedback"), orderBy("createdAt", "desc"), limit(100))
+      );
+      setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    })();
+  }, []);
+
+  async function toggleResolved(id: string, resolved: boolean) {
+    await updateDoc(doc(db, "court_feedback", id), {
+      status: resolved ? "resolved" : "new",
+      resolvedAt: resolved ? serverTimestamp() : null,
+    });
+    setItems((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, status: resolved ? "resolved" : "new" } : f))
+    );
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this feedback? This can't be undone.")) return;
+    await deleteDoc(doc(db, "court_feedback", id));
+    setItems((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  if (loading) return <LoadingSpinner />;
+
+  return (
+    <div className="space-y-3">
+      {items.length === 0 ? (
+        <EmptyState text="No feedback yet" />
+      ) : (
+        items.map((f) => {
+          const resolved = f.status === "resolved";
+          return (
+            <div
+              key={f.id}
+              className={`rounded-xl border border-dash-border bg-dash-bg p-4 ${resolved ? "opacity-50" : ""}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/courts/${f.courtSlug || f.courtId}`}
+                      target="_blank"
+                      className="truncate text-sm font-semibold text-teal hover:underline"
+                    >
+                      {f.courtName || "Unknown court"}
+                    </Link>
+                    {resolved && (
+                      <span className="shrink-0 rounded-full bg-teal/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-teal">
+                        Resolved
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1.5 whitespace-pre-wrap text-sm text-white/80">{f.message}</p>
+                  <p className="mt-2 text-xs text-white/30">
+                    {f.email ? <span className="text-white/50">{f.email}</span> : "No email"} ·{" "}
+                    {formatTs(f.createdAt)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={() => toggleResolved(f.id, !resolved)}
+                    className="rounded-lg border border-dash-border px-2.5 py-1 text-xs font-semibold text-white/60 transition-colors hover:text-white"
+                  >
+                    {resolved ? "Reopen" : "Resolve"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(f.id)}
+                    className="text-white/30 transition-colors hover:text-status-rejected"
+                    aria-label="Delete feedback"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-2 14H7L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { permanentRedirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Court } from "@/lib/types";
 import { courtPath } from "@/lib/slug";
+import GetAppCta from "@/components/GetAppCta";
+import CourtFeedbackButton from "@/components/CourtFeedbackButton";
 import {
   getAllCourtsForStatic,
   getCourtBySlug,
@@ -260,7 +262,20 @@ export default async function CourtDetailsPage({
       {/* Court Name & Address */}
       <div className="mb-6">
         <h1 className="mb-2 text-3xl font-bold">{court.name}</h1>
-        <p className="text-teal">{court.address}</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <p className="text-teal">{court.address}</p>
+          {court.latitude !== 0 && court.longitude !== 0 && (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${court.latitude},${court.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-teal shadow-sm transition-shadow hover:shadow-md"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              Open in Maps
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Regulars social proof — real favoriter count, decorative avatars */}
@@ -293,28 +308,11 @@ export default async function CourtDetailsPage({
       )}
 
       {/* Get the app CTA */}
-      <div className="mb-8 flex flex-col gap-4 rounded-2xl bg-teal-light p-5 sm:flex-row sm:items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/app-icon.png" alt="G.O.A.T.S" className="h-12 w-12 flex-shrink-0 rounded-xl" />
-        <div className="flex-1">
-          <p className="font-semibold text-teal-dark">
-            See who&apos;s playing and much more
-          </p>
-          <p className="text-sm text-text-secondary">
-            Download the app and never miss the action
-          </p>
-        </div>
-        <Link
-          href="/"
-          className="flex-shrink-0 rounded-full bg-coral px-6 py-3 text-center font-semibold text-text-on-dark transition-colors hover:bg-coral-dark"
-        >
-          Get the G.O.A.T.S App
-        </Link>
-      </div>
+      <GetAppCta className="mb-8" />
 
       {/* Goats Take */}
       {court.goatsTake && (
-        <section className="mb-8 rounded-2xl bg-surface p-6 shadow-sm">
+        <section className="mb-4 rounded-2xl bg-surface p-6 shadow-sm">
           <h2 className="mb-3 text-xl font-bold">
             <span className="text-teal">G.O.A.T.S</span> Take
           </h2>
@@ -323,6 +321,13 @@ export default async function CourtDetailsPage({
           </p>
         </section>
       )}
+
+      {/* Edits, thoughts, or comments? */}
+      <CourtFeedbackButton
+        courtId={court.id}
+        courtName={court.name}
+        courtSlug={court.slug || court.id}
+      />
 
       {/* Court Info */}
       <section className="mb-8 rounded-2xl bg-surface p-6 shadow-sm">
@@ -342,19 +347,6 @@ export default async function CourtDetailsPage({
           )}
         </div>
       </section>
-
-      {/* Map Link */}
-      {court.latitude !== 0 && court.longitude !== 0 && (
-        <a
-          href={`https://www.google.com/maps/search/?api=1&query=${court.latitude},${court.longitude}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mb-8 flex items-center justify-center gap-2 rounded-2xl bg-surface p-4 text-teal shadow-sm transition-shadow hover:shadow-md"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-          Open in Google Maps
-        </a>
-      )}
     </main>
   );
 }
