@@ -828,20 +828,36 @@ function UsersPanel() {
 
   return (
     <div className="space-y-2">
-      {users.map((u) => (
-        <div key={u.id as string} className="flex items-center gap-3 rounded-xl border border-dash-border bg-dash-bg px-4 py-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal/20 text-xs font-bold text-teal">
-            {((u.username as string) || "?").charAt(0).toUpperCase()}
+      {users.map((u) => {
+        const signupLine = formatSignupLocation(u);
+        return (
+          <div key={u.id as string} className="flex items-center gap-3 rounded-xl border border-dash-border bg-dash-bg px-4 py-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal/20 text-xs font-bold text-teal">
+              {((u.username as string) || "?").charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white">{u.username as string}</p>
+              <p className="text-xs text-white/40">{u.email as string}</p>
+              {signupLine && (
+                <p className="text-[10px] text-white/40">{signupLine}</p>
+              )}
+            </div>
+            <p className="hidden text-[10px] text-white/20 sm:block">{u.id as string}</p>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-white">{u.username as string}</p>
-            <p className="text-xs text-white/40">{u.email as string}</p>
-          </div>
-          <p className="hidden text-[10px] text-white/20 sm:block">{u.id as string}</p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
+}
+
+function formatSignupLocation(u: Record<string, unknown>): string | null {
+  const name = u.signupNearestCourtName;
+  if (typeof name === "string" && name.length > 0) return `From: ${name}`;
+  const geo = u.signupLocation as { latitude?: number; longitude?: number } | undefined;
+  if (geo && typeof geo.latitude === "number" && typeof geo.longitude === "number") {
+    return `From: ${geo.latitude.toFixed(3)}, ${geo.longitude.toFixed(3)}`;
+  }
+  return null;
 }
 
 function ProfilePicsPanel() {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import BackButton from "@/components/BackButton";
 import { courtPath } from "@/lib/slug";
 import {
   getLocationGroups,
@@ -106,10 +107,13 @@ export default async function LocationHubPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(buildJsonLd(g)) }}
       />
 
+      {/* Back to the previous page */}
+      <BackButton fallback="/basketball-courts" label="Back" className="mb-4 text-sm" />
+
       {/* Breadcrumb */}
       <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-text-muted">
         <Link href="/basketball-courts" className="text-teal hover:text-teal-dark">
-          Basketball Courts
+          Search by Area
         </Link>
         <span>/</span>
         <span className="text-text-secondary">
@@ -118,11 +122,31 @@ export default async function LocationHubPage({
       </nav>
 
       <h1 className="mb-2 text-3xl font-bold">{headline(g)}</h1>
-      <p className="mb-8 text-text-secondary">
+      <p className="mb-6 text-text-secondary">
         {g.courts.length} pickup basketball court
         {g.courts.length !== 1 ? "s" : ""} in {g.city}, {g.stateName}. Tap any
         court for conditions, hoops, hours, and who&apos;s playing.
       </p>
+
+      {/* Get the app CTA */}
+      <div className="mb-8 flex flex-col gap-4 rounded-2xl bg-teal-light p-5 sm:flex-row sm:items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/app-icon.png" alt="G.O.A.T.S" className="h-12 w-12 flex-shrink-0 rounded-xl" />
+        <div className="flex-1">
+          <p className="font-semibold text-teal-dark">
+            See who&apos;s playing and much more
+          </p>
+          <p className="text-sm text-text-secondary">
+            Download the app and never miss the action
+          </p>
+        </div>
+        <Link
+          href="/"
+          className="flex-shrink-0 rounded-full bg-coral px-6 py-3 text-center font-semibold text-text-on-dark transition-colors hover:bg-coral-dark"
+        >
+          Get the G.O.A.T.S App
+        </Link>
+      </div>
 
       <div className="flex flex-col gap-3">
         {g.courts.map((court) => {
@@ -161,16 +185,6 @@ export default async function LocationHubPage({
             </Link>
           );
         })}
-      </div>
-
-      {/* Footer CTA */}
-      <div className="py-10 text-center">
-        <Link
-          href="/"
-          className="inline-block rounded-full bg-coral px-8 py-3 font-semibold text-text-on-dark transition-colors hover:bg-coral-dark"
-        >
-          Get the G.O.A.T.S App
-        </Link>
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import BackButton from "@/components/BackButton";
 import { getLocationGroups } from "@/lib/courts-data";
 
 const SITE = "https://www.goatssportsapp.com";
@@ -56,6 +57,14 @@ export default async function BasketballCourtsIndex() {
         </Link>
       </div>
 
+      {/* Back to the previous page + browse the full court list */}
+      <div className="mb-6 flex items-center justify-between text-sm">
+        <BackButton fallback="/courts" label="Back" />
+        <Link href="/courts" className="text-teal hover:text-teal-dark">
+          Browse all courts &rarr;
+        </Link>
+      </div>
+
       <h1 className="mb-2 text-3xl font-bold">Basketball Courts by City</h1>
       <p className="mb-8 text-text-secondary">
         Find pickup basketball courts near you. Browse by city and borough for
@@ -77,15 +86,6 @@ export default async function BasketballCourtsIndex() {
             </span>
           </Link>
         ))}
-      </div>
-
-      <div className="py-10 text-center">
-        <Link
-          href="/courts"
-          className="text-teal hover:text-teal-dark"
-        >
-          Or browse all courts &rarr;
-        </Link>
       </div>
     </main>
   );

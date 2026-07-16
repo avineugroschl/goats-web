@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { permanentRedirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Court } from "@/lib/types";
@@ -7,6 +8,7 @@ import {
   getAllCourtsForStatic,
   getCourtBySlug,
   getCourtByLegacyId,
+  getRegularsCount,
 } from "@/lib/courts-data";
 
 const SITE = "https://www.goatssportsapp.com";
@@ -23,6 +25,50 @@ export async function generateStaticParams() {
 
 function heroImageOf(court: Court): string | undefined {
   return court.photoUrlFull || court.photoUrlCard || court.photoUrl || undefined;
+}
+
+// Decorative avatar tints for the regulars stack (the faces are generic, the
+// count is real).
+const AVATAR_TINTS = [
+  "bg-teal text-text-on-dark",
+  "bg-coral text-text-on-dark",
+  "bg-teal-light text-teal-dark",
+  "bg-teal-dark text-text-on-dark",
+  "bg-coral-dark text-text-on-dark",
+];
+
+// Turn bare URLs / www links inside a GOATS take into clickable anchors,
+// leaving the surrounding text untouched. Trailing sentence punctuation is
+// peeled off the link so "(see nycgovparks.org)." doesn't swallow the ")." .
+function linkify(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const re = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+    let url = match[0];
+    const trailing = url.match(/[.,;:!?)\]]+$/)?.[0] ?? "";
+    if (trailing) url = url.slice(0, url.length - trailing.length);
+    const href = url.startsWith("http") ? url : `https://${url}`;
+    nodes.push(
+      <a
+        key={match.index}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-teal underline underline-offset-2 hover:text-teal-dark"
+      >
+        {url}
+      </a>
+    );
+    if (trailing) nodes.push(trailing);
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
 }
 
 function metaDescription(court: Court): string {
@@ -161,6 +207,7 @@ export default async function CourtDetailsPage({
   if (!court) notFound();
 
   const heroImage = heroImageOf(court);
+  const regularsCount = await getRegularsCount(court.id);
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-4 py-8">
@@ -170,11 +217,20 @@ export default async function CourtDetailsPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(buildJsonLd(court)) }}
       />
 
-      {/* Breadcrumb (or back link if the court isn't geocoded) */}
-      {court.locationSlug && court.geoCity && court.geoState ? (
+      {/* Back to the main court list */}
+      <Link
+        href="/courts"
+        className="mb-4 inline-flex items-center gap-2 text-teal hover:text-teal-dark"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        Back to courts
+      </Link>
+
+      {/* Breadcrumb (geocoded courts only) */}
+      {court.locationSlug && court.geoCity && court.geoState && (
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-text-muted">
           <Link href="/basketball-courts" className="text-teal hover:text-teal-dark">
-            Basketball Courts
+            Search by Area
           </Link>
           <span>/</span>
           <Link
@@ -186,14 +242,6 @@ export default async function CourtDetailsPage({
           <span>/</span>
           <span className="truncate text-text-secondary">{court.name}</span>
         </nav>
-      ) : (
-        <Link
-          href="/courts"
-          className="mb-6 inline-flex items-center gap-2 text-teal hover:text-teal-dark"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          Back to courts
-        </Link>
       )}
 
       {/* Hero Image */}
@@ -215,19 +263,66 @@ export default async function CourtDetailsPage({
         <p className="text-teal">{court.address}</p>
       </div>
 
+      {/* Regulars social proof — real favoriter count, decorative avatars */}
+      {regularsCount > 0 && (
+        <section className="mb-8 rounded-2xl bg-surface p-5 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-shrink-0 -space-x-3">
+              {Array.from({ length: Math.min(regularsCount, 5) }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-surface ${AVATAR_TINTS[i % AVATAR_TINTS.length]}`}
+                  style={{ zIndex: 5 - i }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z" /></svg>
+                </div>
+              ))}
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold">
+                {regularsCount} player{regularsCount !== 1 ? "s" : ""} call
+                {regularsCount === 1 ? "s" : ""} this their court
+              </p>
+              <p className="text-sm text-text-secondary">
+                Favorite this court in the app to get notified when there&apos;s
+                action.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Get the app CTA */}
-      <div className="mb-8 flex items-center gap-4 rounded-2xl bg-teal-light p-5">
+      <div className="mb-8 flex flex-col gap-4 rounded-2xl bg-teal-light p-5 sm:flex-row sm:items-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/app-icon.png" alt="G.O.A.T.S" className="h-12 w-12 rounded-xl" />
-        <div>
+        <img src="/app-icon.png" alt="G.O.A.T.S" className="h-12 w-12 flex-shrink-0 rounded-xl" />
+        <div className="flex-1">
           <p className="font-semibold text-teal-dark">
-            See who&apos;s playing and check in
+            See who&apos;s playing and much more
           </p>
           <p className="text-sm text-text-secondary">
-            Download the G.O.A.T.S app for real-time updates
+            Download the app and never miss the action
           </p>
         </div>
+        <Link
+          href="/"
+          className="flex-shrink-0 rounded-full bg-coral px-6 py-3 text-center font-semibold text-text-on-dark transition-colors hover:bg-coral-dark"
+        >
+          Get the G.O.A.T.S App
+        </Link>
       </div>
+
+      {/* Goats Take */}
+      {court.goatsTake && (
+        <section className="mb-8 rounded-2xl bg-surface p-6 shadow-sm">
+          <h2 className="mb-3 text-xl font-bold">
+            <span className="text-teal">G.O.A.T.S</span> Take
+          </h2>
+          <p className="leading-relaxed text-text-secondary">
+            {linkify(court.goatsTake)}
+          </p>
+        </section>
+      )}
 
       {/* Court Info */}
       <section className="mb-8 rounded-2xl bg-surface p-6 shadow-sm">
@@ -248,18 +343,6 @@ export default async function CourtDetailsPage({
         </div>
       </section>
 
-      {/* Goats Take */}
-      {court.goatsTake && (
-        <section className="mb-8 rounded-2xl bg-surface p-6 shadow-sm">
-          <h2 className="mb-3 text-xl font-bold">
-            <span className="text-teal">G.O.A.T.S</span> Take
-          </h2>
-          <p className="leading-relaxed text-text-secondary">
-            {court.goatsTake}
-          </p>
-        </section>
-      )}
-
       {/* Map Link */}
       {court.latitude !== 0 && court.longitude !== 0 && (
         <a
@@ -272,16 +355,6 @@ export default async function CourtDetailsPage({
           Open in Google Maps
         </a>
       )}
-
-      {/* Footer CTA */}
-      <div className="py-8 text-center">
-        <Link
-          href="/"
-          className="inline-block rounded-full bg-coral px-8 py-3 font-semibold text-text-on-dark transition-colors hover:bg-coral-dark"
-        >
-          Get the G.O.A.T.S App
-        </Link>
-      </div>
     </main>
   );
 }

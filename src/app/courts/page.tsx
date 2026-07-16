@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useState, useMemo, useRef } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Court } from "@/lib/types";
@@ -8,6 +8,21 @@ import { courtPath } from "@/lib/slug";
 import Link from "next/link";
 
 const NYC = { lat: 40.7128, lng: -73.9060 };
+
+// Module-level cache: survives client-side back navigation so returning to
+// this page renders the full list instantly — no spinner, no scroll jump.
+let courtsCache: Court[] | null = null;
+
+// Record the current scroll position when navigating away from this page
+// (to a court, home, etc.) so a soft-nav back restores exactly where you left.
+function saveScrollPosition() {
+  sessionStorage.setItem("courts_scroll", String(window.scrollY));
+}
+
+// Restore scroll before the browser paints (avoids a visible jump). Falls
+// back to useEffect during SSR where useLayoutEffect is a no-op.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 function getDistanceMiles(
   lat1: number,
@@ -27,8 +42,8 @@ function getDistanceMiles(
 }
 
 export default function CourtsPage() {
-  const [courts, setCourts] = useState<Court[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [courts, setCourts] = useState<Court[]>(courtsCache ?? []);
+  const [loading, setLoading] = useState(courtsCache === null);
   const [search, setSearch] = useState(() =>
     typeof window !== "undefined" ? sessionStorage.getItem("courts_search") || "" : ""
   );
@@ -44,6 +59,11 @@ export default function CourtsPage() {
   });
   const [showConditionDropdown, setShowConditionDropdown] = useState(false);
   const conditionDropdownRef = useRef<HTMLDivElement>(null);
+  const didRestoreScroll = useRef(false);
+  // True only when the list was already cached at mount — i.e. we soft-
+  // navigated back from a details page. On a fresh load/refresh the module
+  // cache is empty, so we skip restore and start at the top.
+  const cameFromSoftNav = useRef(courtsCache !== null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -95,11 +115,32 @@ export default function CourtsPage() {
         id: doc.id,
         ...doc.data(),
       })) as Court[];
+      courtsCache = data;
       setCourts(data);
       setLoading(false);
     }
     fetchCourts();
   }, []);
+
+  // Restore scroll position when returning from a court details page.
+  // With the cached list, the full-height list is already in the DOM on
+  // mount, so restoring in a layout effect (pre-paint) shows the page
+  // already at the right spot — no visible scroll or jump.
+  useIsomorphicLayoutEffect(() => {
+    if (loading || didRestoreScroll.current) return;
+    didRestoreScroll.current = true;
+    if (!cameFromSoftNav.current) return; // fresh load/refresh → stay at top
+    const saved = sessionStorage.getItem("courts_scroll");
+    if (!saved) return;
+    const y = parseInt(saved, 10);
+    // Defer to rAF so this runs *after* Next.js's router scroll reset (which
+    // otherwise snaps us back to the top on back-navigation), but still
+    // before the browser paints. behavior:"instant" overrides the global
+    // `scroll-behavior: smooth`, so there's no animation.
+    requestAnimationFrame(() =>
+      window.scrollTo({ top: y, behavior: "instant" })
+    );
+  }, [loading]);
 
   useEffect(() => {
     sessionStorage.setItem("courts_search", search);
@@ -238,9 +279,29 @@ export default function CourtsPage() {
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-8">
       {/* Header */}
       <div className="mb-6 flex items-center gap-4">
-        <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">
+        <Link href="/" onClick={saveScrollPosition} className="flex items-center gap-3 transition-opacity hover:opacity-80">
           <img src="/app-icon.png" alt="G.O.A.T.S" className="h-8 w-8 rounded-lg" />
           <h1 className="text-2xl font-bold">G.O.A.T.S</h1>
+        </Link>
+      </div>
+
+      {/* Get the app CTA */}
+      <div className="mb-6 flex flex-col gap-4 rounded-2xl bg-teal-light p-5 sm:flex-row sm:items-center">
+        <img src="/app-icon.png" alt="G.O.A.T.S" className="h-12 w-12 flex-shrink-0 rounded-xl" />
+        <div className="flex-1">
+          <p className="font-semibold text-teal-dark">
+            See who&apos;s playing and much more
+          </p>
+          <p className="text-sm text-text-secondary">
+            Download the app and never miss the action
+          </p>
+        </div>
+        <Link
+          href="/"
+          onClick={saveScrollPosition}
+          className="flex-shrink-0 rounded-full bg-coral px-6 py-3 text-center font-semibold text-text-on-dark transition-colors hover:bg-coral-dark"
+        >
+          Get the G.O.A.T.S App
         </Link>
       </div>
 
@@ -425,6 +486,7 @@ function CourtCard({
   return (
     <Link
       href={courtPath(court)}
+      onClick={saveScrollPosition}
       className="flex gap-4 rounded-2xl bg-surface p-3 shadow-sm transition-shadow hover:shadow-md"
     >
       {/* Thumbnail */}

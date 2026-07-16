@@ -6,6 +6,7 @@ import {
   query,
   where,
   limit,
+  getCountFromServer,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { Court } from "./types";
@@ -120,4 +121,22 @@ export async function getLocationBySlug(
 ): Promise<LocationGroup | null> {
   const groups = await getLocationGroups();
   return groups.find((g) => g.locationSlug === locationSlug) || null;
+}
+
+// Count of "regulars" — players who favorited this court and consented to
+// appear (members where visible == true). Public per Firestore rules; powers
+// the "X players call this their court" section on the court page. Returns 0
+// on any error (e.g. rules not yet deployed) so the section simply hides.
+export async function getRegularsCount(courtId: string): Promise<number> {
+  try {
+    const snap = await getCountFromServer(
+      query(
+        collection(db, "courts", courtId, "members"),
+        where("visible", "==", true)
+      )
+    );
+    return snap.data().count;
+  } catch {
+    return 0;
+  }
 }

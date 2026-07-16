@@ -291,8 +291,7 @@ export default function Home() {
             Ready to improve your game?
           </h2>
           <p className="mx-auto mb-10 max-w-md text-text-secondary">
-            Download G.O.A.T.S. It&apos;s not a baaahhh&apos;d decision...
-            sorry.
+            Download G.O.A.T.S, it&apos;s not a baaahhh&apos;d decision.
           </p>
           <a
             href="#app-badges"
