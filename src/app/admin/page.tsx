@@ -24,6 +24,7 @@ import { ref, deleteObject } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { OperatorApplication, NewCourtData } from "@/lib/types";
+import PipelineControls from "@/components/PipelineControls";
 
 type AdminTab = "applications" | "courts" | "liveCourts" | "dashboard" | "ambassadors";
 type DashTab = "comments" | "feedback" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators";
@@ -505,6 +506,8 @@ function PendingCourtsTab() {
   return (
     <div>
       <h1 className="font-display mb-6 text-2xl font-bold text-white">Pending Courts</h1>
+
+      <PipelineControls />
 
       <div className="mb-6 flex gap-2 rounded-xl bg-dash-surface p-1 max-w-xs">
         <button onClick={() => setView("pending")}
