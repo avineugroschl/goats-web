@@ -30,6 +30,7 @@ type Job = {
 
 const STATUS_COLOR: Record<string, string> = {
   queued: "bg-status-pending/20 text-status-pending",
+  discovering: "bg-teal/20 text-teal",
   processing: "bg-teal/20 text-teal",
   awaiting_chatbots: "bg-teal/20 text-teal",
   needs_review: "bg-teal/20 text-teal",
@@ -53,7 +54,7 @@ const STAGE_PCT: Record<string, number> = {
   bots_ingested: 82, carded: 100, review_timeout: 100,
 };
 const STATUS_PCT: Record<string, number> = {
-  queued: 5, processing: 20, awaiting_chatbots: 50, needs_review: 72,
+  queued: 5, discovering: 12, processing: 20, awaiting_chatbots: 50, needs_review: 72,
   cards_ready: 100, needs_human: 100, error: 100,
 };
 function jobPct(j: Job): number {
@@ -62,7 +63,7 @@ function jobPct(j: Job): number {
   const byStatus = j.status ? STATUS_PCT[j.status] : undefined;
   return byStatus ?? 0;
 }
-const ACTIVE = ["queued", "processing", "awaiting_chatbots", "needs_review"];
+const ACTIVE = ["queued", "discovering", "processing", "awaiting_chatbots", "needs_review"];
 
 export default function PipelineControls() {
   const { user } = useAuth();
@@ -72,6 +73,10 @@ export default function PipelineControls() {
   const [name, setName] = useState("");
   const [locator, setLocator] = useState("");
   const [note, setNote] = useState("");
+  const [showFind, setShowFind] = useState(false);
+  const [findLoc, setFindLoc] = useState("");
+  const [findN, setFindN] = useState(5);
+  const [findIndoor, setFindIndoor] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "pipeline_jobs"), orderBy("createdAt", "desc"), limit(12));
@@ -87,6 +92,18 @@ export default function PipelineControls() {
         action: "run_batch", n: 10, source: "500",
         status: "queued", createdBy: user?.uid ?? null, createdAt: serverTimestamp(),
       });
+    } finally { setBusy(false); }
+  }
+
+  async function findCourts() {
+    if (!findLoc.trim()) return;
+    setBusy(true);
+    try {
+      await addDoc(collection(db, "pipeline_jobs"), {
+        action: "discover", location: findLoc.trim(), n: findN, indoor: findIndoor,
+        status: "queued", createdBy: user?.uid ?? null, createdAt: serverTimestamp(),
+      });
+      setFindLoc(""); setShowFind(false);
     } finally { setBusy(false); }
   }
 
@@ -130,6 +147,12 @@ export default function PipelineControls() {
         >
           Add a court by name
         </button>
+        <button
+          onClick={() => setShowFind((s) => !s)}
+          className="rounded-lg border border-dash-border px-4 py-2 text-sm font-medium text-dash-text hover:bg-dash-bg"
+        >
+          Find courts in a place
+        </button>
         <span className="text-xs text-dash-text-muted">
           Runs on your Mac (listener + 6 chatbot tabs must be open).
         </span>
@@ -158,6 +181,37 @@ export default function PipelineControls() {
           >
             Queue this court
           </button>
+        </div>
+      )}
+
+      {showFind && (
+        <div className="mt-4 grid gap-2 sm:max-w-md">
+          <input
+            value={findLoc} onChange={(e) => setFindLoc(e.target.value)}
+            placeholder="Place, e.g. 'Austin, TX' or 'Bushwick, Brooklyn'"
+            className="rounded-lg border border-dash-border bg-dash-bg px-3 py-2 text-sm text-dash-text"
+          />
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-dash-text">
+              How many
+              <input type="number" min={1} max={15} value={findN}
+                onChange={(e) => setFindN(Number(e.target.value))}
+                className="w-16 rounded-lg border border-dash-border bg-dash-bg px-2 py-1.5 text-sm text-dash-text" />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-dash-text">
+              <input type="checkbox" checked={findIndoor} onChange={(e) => setFindIndoor(e.target.checked)} />
+              indoor courts
+            </label>
+          </div>
+          <button
+            onClick={findCourts} disabled={busy || !findLoc.trim()}
+            className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-surface-dark hover:opacity-90 disabled:opacity-50"
+          >
+            Find {findN} {findIndoor ? "indoor " : ""}courts
+          </button>
+          <span className="text-xs text-dash-text-muted">
+            Claude web-searches the area, picks real courts, then runs them through the pipeline.
+          </span>
         </div>
       )}
 
