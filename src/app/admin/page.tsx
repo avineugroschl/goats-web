@@ -26,6 +26,7 @@ import { auth, db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { OperatorApplication, NewCourtData } from "@/lib/types";
 import PipelineControls from "@/components/PipelineControls";
+import PendingCourtCard, { ReviewCourt } from "@/components/PendingCourtCard";
 
 type AdminTab = "applications" | "courts" | "liveCourts" | "dashboard" | "ambassadors";
 type DashTab = "comments" | "feedback" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators";
@@ -446,7 +447,7 @@ function PendingCourtsTab() {
     }
   }
 
-  async function handleApprove(court: PendingCourt) {
+  async function handleApprove(court: ReviewCourt) {
     if (!court.name.trim() || !court.address.trim()) {
       alert("Court name and address are required.");
       return;
@@ -545,54 +546,14 @@ function PendingCourtsTab() {
           <EmptyState text={view === "pending" ? "No pending courts" : "No history yet"} />
         ) : (
           (view === "pending" ? pending : history).map((court) => (
-            <div key={court.id} className="rounded-2xl border border-dash-border bg-dash-surface p-6">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="flex items-center gap-4">
-                  {(court.photoUrlCard || court.photoUrl) && (
-                    <img src={court.photoUrlCard || court.photoUrl} alt="" className="h-14 w-14 rounded-lg object-cover" />
-                  )}
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">{court.name || "Unnamed"}</h3>
-                    <p className="text-sm text-white/40">{court.address}</p>
-                  </div>
-                </div>
-                {court.status !== "pending" && <StatusBadge status={court.status} />}
-              </div>
-
-              <div className="mb-4 grid gap-3 rounded-xl bg-dash-bg p-4 sm:grid-cols-2">
-                <InfoRow label="Setting" value={`${court.setting || "—"} · ${court.accessType || "—"}`} />
-                <InfoRow label="Baskets" value={String(court.baskets || 0)} />
-                <InfoRow label="Condition" value={court.courtCondition || "—"} />
-                <InfoRow label="3PT Line" value={court.threePointLine || "—"} />
-                <InfoRow label="Lights" value={court.hasLights ? "Yes" : "No"} />
-                <InfoRow label="Submitted" value={court.submittedAt?.toDate?.() ? court.submittedAt.toDate().toLocaleDateString() : "—"} />
-                {court.userDescription && (
-                  <div className="sm:col-span-2"><InfoRow label="User Notes" value={court.userDescription} /></div>
-                )}
-                {court.goatsTake && (
-                  <div className="sm:col-span-2"><InfoRow label="Description" value={court.goatsTake} /></div>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                {court.status === "pending" && (
-                  <>
-                    <button onClick={() => handleApprove(court)} disabled={actionLoading === court.id}
-                      className="rounded-xl bg-status-confirmed px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-status-confirmed/80 disabled:opacity-50">
-                      {actionLoading === court.id ? "..." : "Approve"}
-                    </button>
-                    <button onClick={() => handleReject(court.id)} disabled={actionLoading === court.id}
-                      className="rounded-xl bg-status-rejected/10 px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-status-rejected transition-all hover:bg-status-rejected/20 disabled:opacity-50">
-                      Reject
-                    </button>
-                  </>
-                )}
-                <button onClick={() => handleDelete(court.id)} disabled={actionLoading === court.id}
-                  className="rounded-xl border border-dash-border px-4 py-2.5 text-xs text-white/30 hover:text-white/60 disabled:opacity-50">
-                  Hide
-                </button>
-              </div>
-            </div>
+            <PendingCourtCard
+              key={court.id}
+              court={court as unknown as ReviewCourt}
+              busy={actionLoading === court.id}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              onHide={handleDelete}
+            />
           ))
         )}
       </div>
