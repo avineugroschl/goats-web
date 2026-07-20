@@ -12,7 +12,7 @@
  */
 import { useEffect, useState } from "react";
 import {
-  collection, addDoc, onSnapshot, query, orderBy, limit, serverTimestamp,
+  collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, limit, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
@@ -85,9 +85,25 @@ export default function PipelineControls() {
     );
   }, []);
 
+  // A pipeline run is genuinely in-flight while any job is in an ACTIVE status.
+  // `busy` only covers the ~1s enqueue write; `running` is the real "don't start
+  // another one" gate — the Mac listener processes batches one at a time.
+  const activeJobs = jobs.filter((j) => ACTIVE.includes(j.status ?? ""));
+  const running = busy || activeJobs.length > 0;
+
+  // Remove a single job row (also works on a stuck/orphaned one to unblock the gate).
+  const clearJob = (id: string) => deleteDoc(doc(db, "pipeline_jobs", id));
+  // Wipe every finished/errored job so a fresh run starts with a clean list.
+  const clearFinished = () =>
+    Promise.all(
+      jobs.filter((j) => !ACTIVE.includes(j.status ?? "")).map((j) => clearJob(j.id))
+    );
+
   async function runBatch() {
+    if (running) return;
     setBusy(true);
     try {
+      await clearFinished();
       await addDoc(collection(db, "pipeline_jobs"), {
         action: "run_batch", n: 10, source: "500",
         status: "queued", createdBy: user?.uid ?? null, createdAt: serverTimestamp(),
@@ -96,9 +112,10 @@ export default function PipelineControls() {
   }
 
   async function findCourts() {
-    if (!findLoc.trim()) return;
+    if (running || !findLoc.trim()) return;
     setBusy(true);
     try {
+      await clearFinished();
       await addDoc(collection(db, "pipeline_jobs"), {
         action: "discover", location: findLoc.trim(), n: findN, indoor: findIndoor,
         status: "queued", createdBy: user?.uid ?? null, createdAt: serverTimestamp(),
@@ -108,7 +125,7 @@ export default function PipelineControls() {
   }
 
   async function addCourt() {
-    if (!name.trim()) return;
+    if (running || !name.trim()) return;
     setBusy(true);
     // classify the optional locator: coords "lat,lng" | a maps link | an address
     const loc = locator.trim();
@@ -118,6 +135,7 @@ export default function PipelineControls() {
     else if (loc) payload.address = loc;
     if (note.trim()) payload.note = note.trim();
     try {
+      await clearFinished();
       await addDoc(collection(db, "pipeline_jobs"), {
         action: "add_court", ...payload,
         status: "queued", createdBy: user?.uid ?? null, createdAt: serverTimestamp(),
@@ -127,7 +145,6 @@ export default function PipelineControls() {
   }
 
   // show all active jobs + only the SINGLE most recent finished one (jobs are desc)
-  const activeJobs = jobs.filter((j) => ACTIVE.includes(j.status ?? ""));
   const latestDone = jobs.find((j) => !ACTIVE.includes(j.status ?? ""));
   const shownJobs = [...activeJobs, ...(latestDone ? [latestDone] : [])];
 
@@ -136,25 +153,29 @@ export default function PipelineControls() {
       <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={runBatch}
-          disabled={busy}
+          disabled={running}
           className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-surface-dark hover:opacity-90 disabled:opacity-50"
         >
           + Load more draft courts
         </button>
         <button
           onClick={() => setShowAdd((s) => !s)}
-          className="rounded-lg border border-dash-border px-4 py-2 text-sm font-medium text-dash-text hover:bg-dash-bg"
+          disabled={running}
+          className="rounded-lg border border-dash-border px-4 py-2 text-sm font-medium text-dash-text hover:bg-dash-bg disabled:opacity-50"
         >
           Add a court by name
         </button>
         <button
           onClick={() => setShowFind((s) => !s)}
-          className="rounded-lg border border-dash-border px-4 py-2 text-sm font-medium text-dash-text hover:bg-dash-bg"
+          disabled={running}
+          className="rounded-lg border border-dash-border px-4 py-2 text-sm font-medium text-dash-text hover:bg-dash-bg disabled:opacity-50"
         >
           Find courts in a place
         </button>
         <span className="text-xs text-dash-text-muted">
-          Runs on your Mac (listener + 6 chatbot tabs must be open).
+          {running
+            ? "A run is in progress — wait for it to finish before starting another."
+            : "Runs on your Mac (listener + 6 chatbot tabs must be open)."}
         </span>
       </div>
 
@@ -176,7 +197,7 @@ export default function PipelineControls() {
             className="rounded-lg border border-dash-border bg-dash-bg px-3 py-2 text-sm text-dash-text"
           />
           <button
-            onClick={addCourt} disabled={busy || !name.trim()}
+            onClick={addCourt} disabled={running || !name.trim()}
             className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-surface-dark hover:opacity-90 disabled:opacity-50"
           >
             Queue this court
@@ -204,7 +225,7 @@ export default function PipelineControls() {
             </label>
           </div>
           <button
-            onClick={findCourts} disabled={busy || !findLoc.trim()}
+            onClick={findCourts} disabled={running || !findLoc.trim()}
             className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-surface-dark hover:opacity-90 disabled:opacity-50"
           >
             Find {findN} {findIndoor ? "indoor " : ""}courts
@@ -234,6 +255,14 @@ export default function PipelineControls() {
                     {j.error ? ` — ${j.error}` : ""}
                   </span>
                   <span className="ml-auto text-dash-text-muted">{pct}%</span>
+                  <button
+                    onClick={() => clearJob(j.id)}
+                    title="Clear this job from the list"
+                    aria-label="Clear job"
+                    className="text-sm leading-none text-dash-text-muted hover:text-coral"
+                  >
+                    ✕
+                  </button>
                 </div>
                 <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-dash-bg">
                   <div
