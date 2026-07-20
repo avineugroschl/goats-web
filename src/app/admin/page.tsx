@@ -19,6 +19,7 @@ import {
   serverTimestamp,
   Timestamp,
   arrayUnion,
+  onSnapshot,
 } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
@@ -411,7 +412,22 @@ function PendingCourtsTab() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [view, setView] = useState<"pending" | "history">("pending");
 
-  useEffect(() => { loadCourts(); }, []);
+  // Real-time: pipeline cards appear the moment the listener writes them — no refresh.
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "pending_courts"), (snap) => {
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as PendingCourt))
+        .filter((c) => !c.hiddenByAdmin);
+      list.sort((a, b) => {
+        const ta = a.submittedAt?.toDate?.()?.getTime() ?? 0;
+        const tb = b.submittedAt?.toDate?.()?.getTime() ?? 0;
+        return tb - ta;
+      });
+      setCourts(list);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
 
   async function loadCourts() {
     setLoading(true);

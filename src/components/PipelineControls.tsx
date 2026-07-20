@@ -47,6 +47,23 @@ const STAGE_LABEL: Record<string, string> = {
   carded: "cards ready",
 };
 
+// rough % complete by stage (falls back to status)
+const STAGE_PCT: Record<string, number> = {
+  seeded: 15, screenshot_done: 35, bots_pending: 50, awaiting_review: 72,
+  bots_ingested: 82, carded: 100, review_timeout: 100,
+};
+const STATUS_PCT: Record<string, number> = {
+  queued: 5, processing: 20, awaiting_chatbots: 50, needs_review: 72,
+  cards_ready: 100, needs_human: 100, error: 100,
+};
+function jobPct(j: Job): number {
+  const byStage = j.stage ? STAGE_PCT[j.stage] : undefined;
+  if (byStage != null) return byStage;
+  const byStatus = j.status ? STATUS_PCT[j.status] : undefined;
+  return byStatus ?? 0;
+}
+const ACTIVE = ["queued", "processing", "awaiting_chatbots", "needs_review"];
+
 export default function PipelineControls() {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -91,6 +108,11 @@ export default function PipelineControls() {
       setName(""); setLocator(""); setNote(""); setShowAdd(false);
     } finally { setBusy(false); }
   }
+
+  // show all active jobs + only the SINGLE most recent finished one (jobs are desc)
+  const activeJobs = jobs.filter((j) => ACTIVE.includes(j.status ?? ""));
+  const latestDone = jobs.find((j) => !ACTIVE.includes(j.status ?? ""));
+  const shownJobs = [...activeJobs, ...(latestDone ? [latestDone] : [])];
 
   return (
     <div className="mb-6 rounded-xl border border-dash-border bg-dash-surface p-4">
@@ -139,23 +161,35 @@ export default function PipelineControls() {
         </div>
       )}
 
-      {jobs.length > 0 && (
-        <div className="mt-4 space-y-1">
-          {jobs.map((j) => (
-            <div key={j.id} className="flex items-center gap-2 text-xs">
-              <span className={`rounded px-2 py-0.5 font-medium ${STATUS_COLOR[j.status ?? ""] ?? "bg-dash-bg text-dash-text-muted"}`}>
-                {j.status ?? "—"}
-              </span>
-              <span className="text-dash-text">
-                {j.action === "add_court" ? `add "${j.name}"` : `batch of ${j.n ?? 10}`}
-              </span>
-              <span className="text-dash-text-muted">
-                {j.stage ? (STAGE_LABEL[j.stage] ?? j.stage) : ""}
-                {j.status === "cards_ready" && j.pendingCount != null ? ` — ${j.pendingCount} carded` : ""}
-                {j.error ? ` — ${j.error}` : ""}
-              </span>
-            </div>
-          ))}
+      {shownJobs.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {shownJobs.map((j) => {
+            const pct = jobPct(j);
+            return (
+              <div key={j.id} className="text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={`rounded px-2 py-0.5 font-medium ${STATUS_COLOR[j.status ?? ""] ?? "bg-dash-bg text-dash-text-muted"}`}>
+                    {j.status ?? "—"}
+                  </span>
+                  <span className="text-dash-text">
+                    {j.action === "add_court" ? `add "${j.name}"` : `batch of ${j.n ?? 10}`}
+                  </span>
+                  <span className="text-dash-text-muted">
+                    {j.stage ? (STAGE_LABEL[j.stage] ?? j.stage) : ""}
+                    {j.status === "cards_ready" && j.pendingCount != null ? ` — ${j.pendingCount} carded` : ""}
+                    {j.error ? ` — ${j.error}` : ""}
+                  </span>
+                  <span className="ml-auto text-dash-text-muted">{pct}%</span>
+                </div>
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-dash-bg">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${j.status === "error" ? "bg-coral" : "bg-teal"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
