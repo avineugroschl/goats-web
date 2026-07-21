@@ -64,7 +64,10 @@ const STATUS_PCT: Record<string, number> = {
   cards_ready: 100, needs_human: 100, error: 100,
 };
 function jobPct(j: Job): number {
-  if (typeof j.pct === "number") return j.pct;   // live per-court progress from the listener
+  // A finished job (cards_ready/error/needs_human) is fixed at its status pct — ignore any
+  // stale live `pct` left over from the review poll (which caps at 98).
+  if (j.status && !ACTIVE.includes(j.status)) return (j.status ? STATUS_PCT[j.status] : undefined) ?? 100;
+  if (typeof j.pct === "number") return j.pct;   // live per-court progress during review
   const byStage = j.stage ? STAGE_PCT[j.stage] : undefined;
   if (byStage != null) return byStage;
   const byStatus = j.status ? STATUS_PCT[j.status] : undefined;
