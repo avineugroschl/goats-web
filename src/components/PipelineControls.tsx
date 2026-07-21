@@ -26,6 +26,9 @@ type Job = {
   n?: number;
   pendingCount?: number;
   error?: string;
+  pct?: number;           // live progress written by the listener during review
+  reviewed?: number;      // courts finished so far in the review
+  reviewTotal?: number;   // courts in the batch
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -44,6 +47,9 @@ const STAGE_LABEL: Record<string, string> = {
   screenshot_done: "captured satellite",
   bots_pending: "awaiting chatbots",
   awaiting_review: "vision + review",
+  reviewing: "reviewing courts",
+  reenriching: "enriching from late bots",
+  reconciling: "checking for late bots",
   bots_ingested: "scored answers",
   carded: "cards ready",
 };
@@ -58,6 +64,7 @@ const STATUS_PCT: Record<string, number> = {
   cards_ready: 100, needs_human: 100, error: 100,
 };
 function jobPct(j: Job): number {
+  if (typeof j.pct === "number") return j.pct;   // live per-court progress from the listener
   const byStage = j.stage ? STAGE_PCT[j.stage] : undefined;
   if (byStage != null) return byStage;
   const byStatus = j.status ? STATUS_PCT[j.status] : undefined;
@@ -251,6 +258,7 @@ export default function PipelineControls() {
                   </span>
                   <span className="text-dash-text-muted">
                     {j.stage ? (STAGE_LABEL[j.stage] ?? j.stage) : ""}
+                    {j.reviewed != null && j.reviewTotal ? ` ${j.reviewed}/${j.reviewTotal}` : ""}
                     {j.status === "cards_ready" && j.pendingCount != null ? ` — ${j.pendingCount} carded` : ""}
                     {j.error ? ` — ${j.error}` : ""}
                   </span>
