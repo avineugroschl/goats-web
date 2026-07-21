@@ -89,6 +89,9 @@ export default function PendingCourtCard({
         courtCondition: d.courtCondition, threePointLine: d.threePointLine,
         hoursOfOperation: d.hoursOfOperation, phoneNumber: d.phoneNumber,
         goatsTake: d.goatsTake, photoUrlCard: d.photoUrlCard ?? "", photoUrlFull: d.photoUrlFull ?? "",
+        // coordinates — editable so a slightly-off pin can be nudged before approval
+        ...(Number.isFinite(Number(d.latitude)) ? { latitude: Number(d.latitude) } : {}),
+        ...(Number.isFinite(Number(d.longitude)) ? { longitude: Number(d.longitude) } : {}),
       });
       setDirty(false);
     } finally { setSaving(false); }
@@ -131,6 +134,8 @@ export default function PendingCourtCard({
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <Field label="Name"><input className={inputCls} value={d.name} onChange={(e) => set("name", e.target.value)} /></Field>
         <Field label="Address"><input className={inputCls} value={d.address} onChange={(e) => set("address", e.target.value)} /></Field>
+        <Field label="Latitude"><input type="number" step="any" className={inputCls} placeholder="e.g. 40.712776" value={d.latitude ?? ""} onChange={(e) => set("latitude", e.target.value === "" ? undefined : Number(e.target.value))} /></Field>
+        <Field label="Longitude"><input type="number" step="any" className={inputCls} placeholder="e.g. -74.005974" value={d.longitude ?? ""} onChange={(e) => set("longitude", e.target.value === "" ? undefined : Number(e.target.value))} /></Field>
         <Field label="Baskets (hoops)" conf={rv?.hoops?.confidence}>
           <input type="number" className={inputCls} value={d.baskets} onChange={(e) => set("baskets", Number(e.target.value))} />
         </Field>
