@@ -9,16 +9,98 @@ import {
   getCountFromServer,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { getAdminDb } from "./firebase-admin";
 import { Court } from "./types";
 
-// Server-side court reads for static generation + sitemap. `courts` is
-// publicly readable, so the client SDK works fine at build time with no
-// service-account credentials. `web_courts` holds bulk web-only courts
-// (may not exist yet — reads are guarded).
+// Server-side court reads for static generation + sitemap + the /api/courts
+// route. Prefers the Admin SDK (FIREBASE_SERVICE_ACCOUNT env var — bypasses
+// Firestore rules, so `courts` no longer needs to be publicly readable) and
+// falls back to the public client SDK when the service account isn't
+// configured, so builds keep working either way. `web_courts` holds bulk
+// web-only courts (may not exist yet — reads are guarded).
 const SOURCES = ["courts", "web_courts"] as const;
+type Source = (typeof SOURCES)[number];
 
 function toCourt(id: string, data: Record<string, unknown>): Court {
   return { id, ...data } as Court;
+}
+
+// Fetch every doc in a collection. Returns [] on error (missing collection,
+// rules denial during the fallback path, etc.).
+async function fetchCollection(source: Source): Promise<Court[]> {
+  const admin = await getAdminDb();
+  if (admin) {
+    try {
+      const snap = await admin.collection(source).get();
+      return snap.docs.map((d) => toCourt(d.id, d.data()));
+    } catch {
+      return [];
+    }
+  }
+  try {
+    const snap = await getDocs(collection(db, source));
+    return snap.docs.map((d) => toCourt(d.id, d.data()));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchBySlug(source: Source, slug: string): Promise<Court | null> {
+  const admin = await getAdminDb();
+  if (admin) {
+    try {
+      const snap = await admin
+        .collection(source)
+        .where("slug", "==", slug)
+        .limit(1)
+        .get();
+      if (!snap.empty) {
+        const d = snap.docs[0];
+        return toCourt(d.id, d.data());
+      }
+    } catch {
+      // fall through
+    }
+    return null;
+  }
+  try {
+    const snap = await getDocs(
+      query(collection(db, source), where("slug", "==", slug), limit(1))
+    );
+    if (!snap.empty) {
+      const d = snap.docs[0];
+      return toCourt(d.id, d.data());
+    }
+  } catch {
+    // ignore missing collection
+  }
+  return null;
+}
+
+async function fetchById(source: Source, id: string): Promise<Court | null> {
+  const admin = await getAdminDb();
+  if (admin) {
+    try {
+      const snap = await admin.collection(source).doc(id).get();
+      if (snap.exists) return toCourt(snap.id, snap.data() ?? {});
+    } catch {
+      // fall through
+    }
+    return null;
+  }
+  try {
+    const snap = await getDoc(doc(db, source, id));
+    if (snap.exists()) return toCourt(snap.id, snap.data());
+  } catch {
+    // ignore missing collection
+  }
+  return null;
+}
+
+// The app's live courts only (no web_courts) — powers the /courts directory
+// page via /api/courts. Same data the mobile apps show.
+export async function getAppCourts(): Promise<Court[]> {
+  return fetchCollection("courts");
 }
 
 // Every court across both collections, deduped by slug (app `courts` wins
@@ -28,14 +110,8 @@ export async function getAllCourtsForStatic(): Promise<Court[]> {
   const results: Court[] = [];
   const seen = new Set<string>();
   for (const source of SOURCES) {
-    let snap;
-    try {
-      snap = await getDocs(collection(db, source));
-    } catch {
-      continue; // collection may not exist yet
-    }
-    for (const d of snap.docs) {
-      const court = toCourt(d.id, d.data());
+    const courts = await fetchCollection(source);
+    for (const court of courts) {
       const key = court.slug || court.id;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -48,17 +124,8 @@ export async function getAllCourtsForStatic(): Promise<Court[]> {
 // Resolve a court by its URL slug. Checks the app collection first.
 export async function getCourtBySlug(slug: string): Promise<Court | null> {
   for (const source of SOURCES) {
-    try {
-      const snap = await getDocs(
-        query(collection(db, source), where("slug", "==", slug), limit(1))
-      );
-      if (!snap.empty) {
-        const d = snap.docs[0];
-        return toCourt(d.id, d.data());
-      }
-    } catch {
-      // ignore missing collection
-    }
+    const court = await fetchBySlug(source, slug);
+    if (court) return court;
   }
   return null;
 }
@@ -68,12 +135,8 @@ export async function getCourtBySlug(slug: string): Promise<Court | null> {
 // the slug backfill.
 export async function getCourtByLegacyId(id: string): Promise<Court | null> {
   for (const source of SOURCES) {
-    try {
-      const snap = await getDoc(doc(db, source, id));
-      if (snap.exists()) return toCourt(snap.id, snap.data());
-    } catch {
-      // ignore missing collection
-    }
+    const court = await fetchById(source, id);
+    if (court) return court;
   }
   return null;
 }
@@ -124,10 +187,25 @@ export async function getLocationBySlug(
 }
 
 // Count of "regulars" — players who favorited this court and consented to
-// appear (members where visible == true). Public per Firestore rules; powers
-// the "X players call this their court" section on the court page. Returns 0
-// on any error (e.g. rules not yet deployed) so the section simply hides.
+// appear (members where visible == true). Powers the "X players call this
+// their court" section on the court page. Returns 0 on any error so the
+// section simply hides.
 export async function getRegularsCount(courtId: string): Promise<number> {
+  const admin = await getAdminDb();
+  if (admin) {
+    try {
+      const snap = await admin
+        .collection("courts")
+        .doc(courtId)
+        .collection("members")
+        .where("visible", "==", true)
+        .count()
+        .get();
+      return snap.data().count;
+    } catch {
+      return 0;
+    }
+  }
   try {
     const snap = await getCountFromServer(
       query(

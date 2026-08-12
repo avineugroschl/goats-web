@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, useMemo, useRef } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Court } from "@/lib/types";
 import { courtPath } from "@/lib/slug";
 import Link from "next/link";
@@ -111,11 +109,12 @@ export default function CourtsPage() {
 
   useEffect(() => {
     async function fetchCourts() {
-      const snapshot = await getDocs(collection(db, "courts"));
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Court[];
+      // Server-side read via /api/courts (see that route) — the browser no
+      // longer queries Firestore directly, so `courts` doesn't need to be
+      // world-readable.
+      const res = await fetch("/api/courts");
+      if (!res.ok) throw new Error(`courts fetch failed: ${res.status}`);
+      const data = (await res.json()) as Court[];
       courtsCache = data;
       setCourts(data);
       setLoading(false);
