@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://goatssportsapp.com/sitemap.xml
+Sitemap: https://www.goatssportsapp.com/sitemap.xml
