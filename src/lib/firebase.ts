@@ -21,14 +21,16 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// App Check (reCAPTCHA Enterprise). Inert until
-// NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY is set in Vercel env — register
-// the web app under Firebase console → App Check first. Browser-only:
+// App Check (reCAPTCHA Enterprise). The site key is public by design (it
+// ships in this bundle either way), so it's hardcoded like the Firebase
+// config above — env var kept as an optional override. Browser-only:
 // reCAPTCHA can't run during SSR/build (server reads use the Admin SDK,
 // which doesn't need App Check).
 // For local dev after enforcement, set NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN to a
 // debug token registered in the console.
-const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY;
+const recaptchaSiteKey =
+  process.env.NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY ||
+  "6LcJfYEtAAAAADldKp0PbFN3KUfufd1-Vw90dTOl";
 if (typeof window !== "undefined" && recaptchaSiteKey) {
   if (process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN) {
     (
