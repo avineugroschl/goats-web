@@ -453,7 +453,7 @@ function PaymentRequiredState() {
               Activate Your Dashboard
             </h2>
             <p className="mb-6 text-sm text-white/40">
-              Subscribe to start managing your court on G.O.A.T.S.
+              Subscribe to start managing your court on G.O.A.T.S
             </p>
 
             <div className="mb-6 flex items-baseline gap-1">

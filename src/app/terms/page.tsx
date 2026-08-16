@@ -17,7 +17,7 @@ export default function TermsOfService() {
 
       <article className="mx-auto max-w-3xl px-6 py-12 sm:px-12">
         <h1 className="font-display mb-2 text-3xl font-extrabold text-white sm:text-4xl">Terms of Service</h1>
-        <p className="mb-12 text-sm text-white/30">Last updated: May 19, 2026</p>
+        <p className="mb-12 text-sm text-white/30">Last updated: August 16, 2026</p>
 
         <div className="space-y-10 text-sm leading-relaxed text-white/60">
           <Section title="1. Acceptance of Terms">
@@ -64,8 +64,35 @@ export default function TermsOfService() {
               <li>Post inappropriate, offensive, or illegal content in chat or comments</li>
               <li>Attempt to manipulate check-in data or location information</li>
               <li>Interfere with or disrupt the Service or its infrastructure</li>
+              <li>
+                Access or use the Service through any automated means, including bots, scrapers, crawlers, spiders, or
+                scripts, except as expressly permitted below
+              </li>
+              <li>
+                Scrape, harvest, copy, or bulk-collect any data from the Service — including court listings, check-in
+                and presence data, busyness data, ratings, chat messages, or user profiles — whether by automated or
+                manual means
+              </li>
+              <li>
+                Access or attempt to access the Service&apos;s servers, APIs, or databases by any means other than the
+                official G.O.A.T.S mobile applications and the goatssportsapp.com website
+              </li>
+              <li>
+                Reverse engineer, decompile, or disassemble any part of the Service, except to the extent this
+                restriction is prohibited by applicable law
+              </li>
+              <li>
+                Use any data obtained from the Service to build, train, or improve any competing product, database, or
+                machine-learning model
+              </li>
               <li>Use the Service for any purpose other than its intended use</li>
             </ul>
+            <p className="mt-3">
+              Notwithstanding the above, we grant operators of public search engines a limited, revocable permission to
+              crawl publicly available pages of the website in accordance with our robots.txt file, solely as necessary
+              to create publicly available searchable indices of those pages (but not caches, archives, or datasets of
+              Service content). We may revoke this permission at any time.
+            </p>
           </Section>
 
           <Section title="5. Court Operator Terms">
@@ -88,12 +115,17 @@ export default function TermsOfService() {
           </Section>
 
           <Section title="7. Content and Intellectual Property">
-            <p>
+            <p className="mb-3">
               You retain ownership of content you submit (photos, comments, chat messages). By posting content to the
               Service, you grant Eclipsis a non-exclusive, royalty-free license to display that content within the
               Service. You represent that you have the right to share any content you upload. We may remove content
               that violates these terms without notice. If you believe content on the Service infringes your copyright,
               contact us at office@goatssportsapp.com and we will promptly review and remove infringing material.
+            </p>
+            <p>
+              As between you and Eclipsis, the Service itself — including its software, design, and the selection,
+              compilation, and arrangement of court data, check-in data, and other Service content — is owned by
+              Eclipsis L.L.C., and all rights not expressly granted are reserved.
             </p>
           </Section>
 

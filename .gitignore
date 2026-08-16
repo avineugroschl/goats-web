@@ -7,3 +7,5 @@ out/
 .DS_Store
 tsconfig.tsbuildinfo
 _image-originals/
+.vercel
+.env*
