@@ -73,6 +73,10 @@ export default function CourtForm({
   const [phoneNumber, setPhoneNumber] = useState(
     existingCourt?.phoneNumber ?? ""
   );
+  const [bookingUrl, setBookingUrl] = useState(existingCourt?.bookingUrl ?? "");
+  const [bookingEnabled, setBookingEnabled] = useState(
+    Boolean(existingCourt?.bookingUrl)
+  );
   const [courtCondition, setCourtCondition] = useState(
     existingCourt?.courtCondition || "Okay"
   );
@@ -157,6 +161,7 @@ export default function CourtForm({
         hasLights,
         hoursOfOperation,
         phoneNumber,
+        bookingUrl: bookingEnabled ? bookingUrl.trim() : "",
         courtCondition,
         threePointLine,
         goatsTake,
@@ -300,6 +305,21 @@ export default function CourtForm({
             placeholder="(212) 555-0100"
             inputMode="tel"
           />
+
+          <Toggle
+            label="Book Court Button"
+            value={bookingEnabled}
+            onChange={setBookingEnabled}
+          />
+
+          {bookingEnabled && (
+            <TextField
+              label="Booking Link URL"
+              value={bookingUrl}
+              onChange={setBookingUrl}
+              placeholder="https://…"
+            />
+          )}
 
           <Dropdown
             label="Court Condition"

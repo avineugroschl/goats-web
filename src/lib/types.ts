@@ -30,6 +30,9 @@ export interface Court {
   photoUrlCard: string;
   photoUrlFull: string;
   phoneNumber: string;
+  // External booking page URL — non-empty shows the "Book court" link on
+  // court pages (apps + website). Optional because legacy docs lack it.
+  bookingUrl?: string;
   // IANA timezone (e.g. "America/New_York"), populated by the
   // `syncCourtTimeZone` Cloud Function from lat/lng. Optional because legacy
   // court docs may predate that function — callers fall back to a default.
@@ -117,6 +120,7 @@ export interface NewCourtData {
   courtCondition: string;
   threePointLine: string;
   phoneNumber: string;
+  bookingUrl?: string;
   description: string;
   // Photo URLs uploaded at signup time (optional). Stored at
   // court_photos/{pendingCourtId}_card.webp + _full.webp so the same paths

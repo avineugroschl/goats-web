@@ -52,6 +52,8 @@ interface NewCourtFormData {
   courtCondition: string;
   threePointLine: string;
   phoneNumber: string;
+  bookingEnabled: boolean;
+  bookingUrl: string;
   description: string;
 }
 
@@ -103,6 +105,8 @@ export default function OperatorSignup() {
     courtCondition: "Okay",
     threePointLine: "None",
     phoneNumber: "",
+    bookingEnabled: false,
+    bookingUrl: "",
     description: "",
   });
 
@@ -398,6 +402,7 @@ export default function OperatorSignup() {
           courtCondition: courtData.courtCondition,
           threePointLine: courtData.threePointLine,
           phoneNumber: courtData.phoneNumber.trim(),
+          bookingUrl: courtData.bookingEnabled ? courtData.bookingUrl.trim() : "",
           description: courtData.description.trim(),
           photoUrlCard: photoUrlCard ?? "",
           photoUrlFull: photoUrlFull ?? "",
@@ -751,6 +756,33 @@ export default function OperatorSignup() {
                     placeholder="(555) 123-4567"
                   />
 
+                  {/* Book court button (optional external booking link) */}
+                  <button
+                    type="button"
+                    onClick={() => setCourtData({ ...courtData, bookingEnabled: !courtData.bookingEnabled })}
+                    className="flex items-center gap-3 rounded-xl border border-dash-border bg-dash-bg px-4 py-3"
+                  >
+                    <div className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
+                      courtData.bookingEnabled ? "border-teal bg-teal" : "border-white/20"
+                    }`}>
+                      {courtData.bookingEnabled && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-sm text-white/60">Add a &quot;Book court&quot; button (links to your booking page)</span>
+                  </button>
+
+                  {courtData.bookingEnabled && (
+                    <InputField
+                      label="Booking Link URL"
+                      value={courtData.bookingUrl}
+                      onChange={(v) => setCourtData({ ...courtData, bookingUrl: v })}
+                      placeholder="https://…"
+                    />
+                  )}
+
                   {/* Photo upload */}
                   <div>
                     <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-white/40">
@@ -881,6 +913,7 @@ export default function OperatorSignup() {
                       <ReviewRow label="Lights" value={courtData.hasLights ? "Yes" : "No"} />
                       {courtData.hoursOfOperation && <ReviewRow label="Hours" value={courtData.hoursOfOperation} />}
                       {courtData.phoneNumber && <ReviewRow label="Phone" value={courtData.phoneNumber} />}
+                      {courtData.bookingEnabled && courtData.bookingUrl && <ReviewRow label="Booking link" value={courtData.bookingUrl} />}
                       <ReviewRow label="Photo" value={photoFile ? "Uploaded" : "Not provided"} />
                     </>
                   ) : (

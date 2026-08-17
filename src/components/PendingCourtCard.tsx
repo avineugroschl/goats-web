@@ -37,6 +37,7 @@ export type ReviewCourt = {
   threePointLine: string;
   hoursOfOperation: string;
   phoneNumber: string;
+  bookingUrl?: string;
   goatsTake: string;
   photoUrl?: string;
   photoUrlCard?: string;
@@ -88,6 +89,7 @@ export default function PendingCourtCard({
         setting: d.setting, accessType: d.accessType, hasLights: !!d.hasLights,
         courtCondition: d.courtCondition, threePointLine: d.threePointLine,
         hoursOfOperation: d.hoursOfOperation, phoneNumber: d.phoneNumber,
+        bookingUrl: (d.bookingUrl ?? "").trim(),
         goatsTake: d.goatsTake, photoUrlCard: d.photoUrlCard ?? "", photoUrlFull: d.photoUrlFull ?? "",
         // coordinates — editable so a slightly-off pin can be nudged before approval
         ...(Number.isFinite(Number(d.latitude)) ? { latitude: Number(d.latitude) } : {}),
@@ -158,6 +160,7 @@ export default function PendingCourtCard({
         <Field label="3PT line"><input className={inputCls} value={d.threePointLine} onChange={(e) => set("threePointLine", e.target.value)} /></Field>
         <Field label="Hours"><input className={inputCls} placeholder="blank if unverified" value={d.hoursOfOperation} onChange={(e) => set("hoursOfOperation", e.target.value)} /></Field>
         <Field label="Phone"><input className={inputCls} placeholder="blank if unverified" value={d.phoneNumber} onChange={(e) => set("phoneNumber", e.target.value)} /></Field>
+        <Field label="Booking link"><input className={inputCls} placeholder="blank = no Book button" value={d.bookingUrl ?? ""} onChange={(e) => set("bookingUrl", e.target.value)} /></Field>
       </div>
 
       <div className="mb-4">

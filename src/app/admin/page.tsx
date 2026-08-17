@@ -209,6 +209,7 @@ function ApplicationsTab() {
           courtCondition: app.courtData.courtCondition,
           threePointLine: app.courtData.threePointLine || "None",
           phoneNumber: app.courtData.phoneNumber,
+          bookingUrl: app.courtData.bookingUrl || "",
           goatsTake: app.courtData.description,
           photoUrl: cardUrl,
           photoUrlCard: cardUrl,
@@ -394,6 +395,7 @@ interface PendingCourt {
   hasLights: boolean;
   hoursOfOperation: string;
   phoneNumber: string;
+  bookingUrl?: string;
   courtCondition: string;
   threePointLine: string;
   goatsTake: string;
@@ -466,6 +468,7 @@ function PendingCourtsTab() {
         hasLights: court.hasLights || false,
         hoursOfOperation: court.hoursOfOperation || "",
         phoneNumber: court.phoneNumber || "",
+        bookingUrl: court.bookingUrl || "",
         courtCondition: court.courtCondition || "Okay",
         threePointLine: court.threePointLine || "None",
         goatsTake: court.goatsTake || "",
@@ -978,14 +981,38 @@ function ProfilePicsPanel() {
   );
 }
 
+const DURATION_FILTERS = [
+  { label: "All", minMinutes: 0 },
+  { label: "5m+", minMinutes: 5 },
+  { label: "10m+", minMinutes: 10 },
+  { label: "30m+", minMinutes: 30 },
+  { label: "1h+", minMinutes: 60 },
+];
+
+function visitDurationMinutes(v: Record<string, unknown>): number | null {
+  const inTs = v.checkInTime as { seconds?: number } | undefined;
+  const outTs = v.checkOutTime as { seconds?: number } | undefined;
+  if (typeof inTs?.seconds !== "number" || typeof outTs?.seconds !== "number") return null;
+  return (outTs.seconds - inTs.seconds) / 60;
+}
+
+function formatDuration(minutes: number): string {
+  if (minutes < 1) return "<1m";
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
 function CheckInsPanel() {
   const [visits, setVisits] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
+  const [minMinutes, setMinMinutes] = useState(0);
   const [names, setNames] = useState<{ users: Record<string, string>; courts: Record<string, string> }>({ users: {}, courts: {} });
 
   useEffect(() => {
     (async () => {
-      const snap = await getDocs(query(collection(db, "courtVisits"), orderBy("checkInTime", "desc"), limit(50)));
+      const snap = await getDocs(query(collection(db, "courtVisits"), orderBy("checkInTime", "desc"), limit(200)));
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
       setVisits(list);
 
@@ -1010,17 +1037,40 @@ function CheckInsPanel() {
 
   if (loading) return <LoadingSpinner />;
 
+  const filtered = minMinutes === 0
+    ? visits
+    : visits.filter((v) => {
+        const d = visitDurationMinutes(v);
+        return d !== null && d >= minMinutes;
+      });
+
   return (
     <div className="space-y-2">
-      {visits.length === 0 ? <EmptyState text="No check-ins" /> : visits.map((v) => (
-        <div key={v.id as string} className="flex items-center justify-between rounded-xl border border-dash-border bg-dash-bg px-4 py-3">
-          <div>
-            <p className="text-sm font-medium text-white">{names.users[v.userId as string] || "Unknown"}</p>
-            <p className="text-xs text-white/40">{names.courts[v.courtId as string] || "Unknown court"}</p>
+      <div className="mb-4 flex flex-wrap gap-1 rounded-xl bg-dash-surface p-1">
+        {DURATION_FILTERS.map((f) => (
+          <button key={f.minMinutes} onClick={() => setMinMinutes(f.minMinutes)}
+            className={`rounded-lg px-4 py-2 font-display text-xs font-bold transition-all ${
+              minMinutes === f.minMinutes ? "bg-teal text-surface-dark" : "text-dash-text-muted hover:text-dash-text"
+            }`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+      {filtered.length === 0 ? <EmptyState text="No check-ins" /> : filtered.map((v) => {
+        const duration = visitDurationMinutes(v);
+        return (
+          <div key={v.id as string} className="flex items-center justify-between rounded-xl border border-dash-border bg-dash-bg px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-white">{names.users[v.userId as string] || "Unknown"}</p>
+              <p className="text-xs text-white/40">{names.courts[v.courtId as string] || "Unknown court"}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-medium text-teal">{duration !== null ? formatDuration(duration) : "—"}</p>
+              <p className="text-xs text-white/30">{formatTs(v.checkInTime)}</p>
+            </div>
           </div>
-          <p className="text-xs text-white/30">{formatTs(v.checkInTime)}</p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

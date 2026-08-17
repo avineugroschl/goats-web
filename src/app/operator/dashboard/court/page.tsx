@@ -59,6 +59,8 @@ export default function CourtManagement() {
   const [courtCondition, setCourtCondition] = useState("Okay");
   const [threePointLine, setThreePointLine] = useState("None");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [bookingUrl, setBookingUrl] = useState("");
+  const [bookingEnabled, setBookingEnabled] = useState(false);
 
   // Schedule
   const [schedule, setSchedule] = useState<Record<string, DaySchedule | null>>({});
@@ -87,7 +89,7 @@ export default function CourtManagement() {
   const snap = JSON.stringify({
     name, address, latitude, longitude, description, baskets, setting,
     accessType, hasLights, hoursOfOperation, courtCondition, threePointLine,
-    phoneNumber, schedule, scheduleEnabled, scheduleOverrides, bannerText,
+    phoneNumber, bookingUrl, bookingEnabled, schedule, scheduleEnabled, scheduleOverrides, bannerText,
     promoText, promoActive,
   });
   const hasChanges = savedSnapshot.current !== "" && snap !== savedSnapshot.current;
@@ -139,6 +141,8 @@ export default function CourtManagement() {
         setCourtCondition(data.courtCondition || "Okay");
         setThreePointLine(data.threePointLine || "None");
         setPhoneNumber(data.phoneNumber ?? "");
+        setBookingUrl(data.bookingUrl ?? "");
+        setBookingEnabled(Boolean(data.bookingUrl));
         setSchedule(data.schedule ?? {});
         setScheduleEnabled(data.scheduleEnabled ?? false);
 
@@ -197,6 +201,7 @@ export default function CourtManagement() {
       courtCondition,
       threePointLine,
       phoneNumber: phoneNumber.trim(),
+      bookingUrl: bookingEnabled ? bookingUrl.trim() : "",
     };
   }
 
@@ -607,6 +612,28 @@ export default function CourtManagement() {
             <Field label="Phone Number *">
               <Input value={phoneNumber} onChange={setPhoneNumber} placeholder="(555) 123-4567" />
             </Field>
+
+            <button
+              onClick={() => setBookingEnabled(!bookingEnabled)}
+              className="flex items-center gap-3 rounded-xl border border-dash-border bg-dash-bg px-4 py-3"
+            >
+              <div className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
+                bookingEnabled ? "border-teal bg-teal" : "border-white/20"
+              }`}>
+                {bookingEnabled && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                )}
+              </div>
+              <span className="text-sm text-white/60">&quot;Book court&quot; button (links to your booking page)</span>
+            </button>
+
+            {bookingEnabled && (
+              <Field label="Booking Link URL">
+                <Input value={bookingUrl} onChange={setBookingUrl} placeholder="https://…" />
+              </Field>
+            )}
           </div>
         )}
 

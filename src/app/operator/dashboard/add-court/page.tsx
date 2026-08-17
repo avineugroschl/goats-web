@@ -29,6 +29,8 @@ interface NewCourtFormData {
   courtCondition: string;
   threePointLine: string;
   phoneNumber: string;
+  bookingEnabled: boolean;
+  bookingUrl: string;
   description: string;
 }
 
@@ -74,6 +76,8 @@ export default function AddCourtPage() {
     courtCondition: "Okay",
     threePointLine: "None",
     phoneNumber: "",
+    bookingEnabled: false,
+    bookingUrl: "",
     description: "",
   });
 
@@ -186,6 +190,7 @@ export default function AddCourtPage() {
           courtCondition: courtData.courtCondition,
           threePointLine: courtData.threePointLine,
           phoneNumber: courtData.phoneNumber.trim(),
+          bookingUrl: courtData.bookingEnabled ? courtData.bookingUrl.trim() : "",
           description: courtData.description.trim(),
           photoUrlCard: photoUrlCard ?? "",
           photoUrlFull: photoUrlFull ?? "",
@@ -390,6 +395,27 @@ export default function AddCourtPage() {
             />
             Has lights
           </label>
+
+          <label className="flex items-center gap-3 text-sm text-white/70">
+            <input
+              type="checkbox"
+              checked={courtData.bookingEnabled}
+              onChange={(e) => setCourtData({ ...courtData, bookingEnabled: e.target.checked })}
+              className="h-4 w-4 rounded border-dash-border bg-dash-bg accent-teal"
+            />
+            Add a &quot;Book court&quot; button (links to your booking page)
+          </label>
+
+          {courtData.bookingEnabled && (
+            <Field label="Booking Link URL">
+              <input
+                value={courtData.bookingUrl}
+                onChange={(e) => setCourtData({ ...courtData, bookingUrl: e.target.value })}
+                className="w-full rounded-lg border border-dash-border bg-dash-bg px-3 py-2 text-sm text-white outline-none focus:border-teal/60"
+                placeholder="https://…"
+              />
+            </Field>
+          )}
 
           {/* Photo */}
           <div>

@@ -345,6 +345,21 @@ export default async function CourtDetailsPage({
           {court.phoneNumber && (
             <InfoRow label="Phone" value={court.phoneNumber} />
           )}
+          {court.bookingUrl && (
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                Booking
+              </p>
+              <a
+                href={/^https?:\/\//.test(court.bookingUrl) ? court.bookingUrl : `https://${court.bookingUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-0.5 inline-block font-semibold text-teal hover:underline"
+              >
+                Book court ↗
+              </a>
+            </div>
+          )}
         </div>
       </section>
     </main>
