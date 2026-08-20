@@ -71,7 +71,7 @@ const jsonLd = {
         APP_CONFIG.appStoreUrl,
         APP_CONFIG.playStoreUrl,
         "https://www.instagram.com/goatssportsapp/",
-        "https://www.facebook.com/goatssportsapp",
+        "https://www.facebook.com/goatspickupbasketballapp",
         "https://x.com/goatssportsapp",
         "https://www.tiktok.com/@goatssportsapp",
         "https://www.threads.com/@goatssportsapp",
