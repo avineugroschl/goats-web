@@ -23,6 +23,42 @@ export default function Footer() {
             </Link>
           </div>
 
+          {/* Social */}
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm">
+            <a
+              href="https://www.instagram.com/goatssportsapp/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/40 transition-colors hover:text-white/70"
+            >
+              Instagram
+            </a>
+            <a
+              href="https://www.facebook.com/goatssportsapp"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/40 transition-colors hover:text-white/70"
+            >
+              Facebook
+            </a>
+            <a
+              href="https://x.com/goatssportsapp"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/40 transition-colors hover:text-white/70"
+            >
+              X
+            </a>
+            <a
+              href="https://www.linkedin.com/company/g-o-a-t-s-pickup-basketball-app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/40 transition-colors hover:text-white/70"
+            >
+              LinkedIn
+            </a>
+          </div>
+
           {/* Contact */}
           <div className="text-center text-sm text-white/40">
             <a href="mailto:office@goatssportsapp.com" className="transition-colors hover:text-teal">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { APP_CONFIG } from "@/lib/app-config";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.goatssportsapp.com"),
@@ -58,19 +59,44 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "G.O.A.T.S",
-  alternateName: ["GOATS", "GOATS App", "G.O.A.T.S App"],
-  applicationCategory: "SportsApplication",
-  operatingSystem: "iOS, Android",
-  description:
-    "Find pickup basketball courts near you, see who's playing in real time, check in, and rate other players. The ultimate pickup basketball app.",
-  url: "https://www.goatssportsapp.com",
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-  },
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.goatssportsapp.com/#organization",
+      name: "G.O.A.T.S",
+      alternateName: ["GOATS", "GOATS App", "G.O.A.T.S App"],
+      url: "https://www.goatssportsapp.com",
+      logo: "https://www.goatssportsapp.com/icon.png",
+      sameAs: [
+        APP_CONFIG.appStoreUrl,
+        APP_CONFIG.playStoreUrl,
+        "https://www.instagram.com/goatssportsapp/",
+        "https://www.facebook.com/goatssportsapp",
+        "https://x.com/goatssportsapp",
+        "https://www.tiktok.com/@goatssportsapp",
+        "https://www.threads.com/@goatssportsapp",
+        "https://www.youtube.com/@goatssportsapp",
+        "https://www.linkedin.com/company/g-o-a-t-s-pickup-basketball-app",
+        "https://www.crunchbase.com/organization/g-o-a-t-s",
+      ],
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "G.O.A.T.S",
+      alternateName: ["GOATS", "GOATS App", "G.O.A.T.S App"],
+      applicationCategory: "SportsApplication",
+      operatingSystem: "iOS, Android",
+      description:
+        "Find pickup basketball courts near you, see who's playing in real time, check in, and rate other players. The ultimate pickup basketball app.",
+      url: "https://www.goatssportsapp.com",
+      publisher: { "@id": "https://www.goatssportsapp.com/#organization" },
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+    },
+  ],
 };
 
 export default function RootLayout({
