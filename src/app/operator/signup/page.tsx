@@ -696,11 +696,11 @@ export default function OperatorSignup() {
                       onChange={(v) => setCourtData({ ...courtData, setting: v })}
                       options={["Indoor", "Outdoor"]}
                     />
-                    <InputField
+                    <SelectField
                       label="Access Type"
                       value={courtData.accessType}
                       onChange={(v) => setCourtData({ ...courtData, accessType: v })}
-                      placeholder="e.g. Public, Private, Members Only"
+                      options={["Public", "Private", "Membership"]}
                     />
                   </div>
 

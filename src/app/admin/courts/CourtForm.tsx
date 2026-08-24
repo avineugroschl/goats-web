@@ -22,7 +22,7 @@ import {
 } from "@/lib/processImage";
 
 const SETTING_OPTIONS = ["Outdoor", "Indoor"] as const;
-const ACCESS_OPTIONS = ["Public", "Private"] as const;
+const ACCESS_OPTIONS = ["Public", "Private", "Membership"] as const;
 const CONDITION_OPTIONS = [
   "Below Average",
   "Okay",

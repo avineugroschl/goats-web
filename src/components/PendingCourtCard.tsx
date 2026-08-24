@@ -148,7 +148,9 @@ export default function PendingCourtCard({
         </Field>
         <Field label="Access">
           <select className={inputCls} value={d.accessType} onChange={(e) => set("accessType", e.target.value)}>
-            <option>Public</option><option>Private</option><option>Membership Required</option>
+            {/* "Membership" is canonical (filter matches by prefix); the old
+                "Membership Required" stays so existing drafts render right. */}
+            <option>Public</option><option>Private</option><option>Membership</option><option>Membership Required</option>
           </select>
         </Field>
         <Field label="Lights" conf={rv?.lights?.confidence}>
