@@ -54,6 +54,20 @@ body {
   font-family: var(--font-display);
 }
 
+/* The "G.O.A.T.S" wordmark — matches the iOS app exactly.
+   iOS renders it as live Syne text (AppFonts.brand): Syne ExtraBold (800)
+   with +0.05em letter-spacing (the app's logo-lockup tracking on the
+   Welcome / Login / Sign-Up screens). Set size + color at the call site;
+   never override font-family, weight, or letter-spacing here.
+   font-synthesis: none guards against a faux-bold smear if the 800 weight
+   ever fails to load. */
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  font-synthesis: none;
+}
+
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;

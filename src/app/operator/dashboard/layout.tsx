@@ -190,7 +190,7 @@ function DashboardShell({
         <div className="border-b border-dash-border px-4 py-3">
           <div className="mb-2 flex items-center gap-2 px-2">
             <img src="/app-icon.png" alt="G.O.A.T.S" className="h-7 w-7 rounded-lg" />
-            <span className="font-display text-xs font-bold text-white">G.O.A.T.S</span>
+            <span className="wordmark text-xs text-white">G.O.A.T.S</span>
             <span className="rounded bg-teal/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal">
               Operator
             </span>

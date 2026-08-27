@@ -11,7 +11,7 @@ export default function PrivacyPolicy() {
       <nav className="flex items-center justify-between px-6 py-4 sm:px-12">
         <Link href="/" className="flex items-center gap-3">
           <img src="/app-icon.png" alt="G.O.A.T.S" className="h-10 w-10 rounded-xl" />
-          <span className="font-display text-xl font-bold tracking-tight text-text-on-dark">G.O.A.T.S</span>
+          <span className="wordmark text-xl text-text-on-dark">G.O.A.T.S</span>
         </Link>
       </nav>
 

@@ -86,7 +86,7 @@ export default function AdminReviewPanel() {
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-3">
             <img src="/app-icon.png" alt="G.O.A.T.S" className="h-8 w-8 rounded-lg" />
-            <span className="font-display text-sm font-bold text-white">G.O.A.T.S</span>
+            <span className="wordmark text-sm text-white">G.O.A.T.S</span>
           </Link>
           <span className="rounded bg-coral/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-coral">
             {isCourtsOnly ? "Courts Editor" : "Admin"}

@@ -95,7 +95,7 @@ export default function Home() {
             alt="G.O.A.T.S"
             className="h-10 w-10 rounded-xl"
           />
-          <span className="hidden font-display text-xl font-bold tracking-tight text-text-primary sm:block">
+          <span className="hidden wordmark text-xl text-text-primary sm:block">
             G.O.A.T.S
           </span>
         </div>

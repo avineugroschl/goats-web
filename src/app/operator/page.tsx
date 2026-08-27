@@ -86,7 +86,7 @@ export default function OperatorLanding() {
             alt="G.O.A.T.S"
             className="h-10 w-10 rounded-xl"
           />
-          <span className="font-display text-xl font-bold tracking-tight text-text-on-dark">
+          <span className="wordmark text-xl text-text-on-dark">
             G.O.A.T.S
           </span>
         </Link>

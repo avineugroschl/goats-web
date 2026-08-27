@@ -281,7 +281,7 @@ export default function CourtsPage() {
       <div className="mb-6 flex items-center gap-4">
         <Link href="/" onClick={saveScrollPosition} className="flex items-center gap-3 transition-opacity hover:opacity-80">
           <img src="/app-icon.png" alt="G.O.A.T.S" className="h-8 w-8 rounded-lg" />
-          <h1 className="text-2xl font-bold">G.O.A.T.S</h1>
+          <h1 className="wordmark text-base">G.O.A.T.S</h1>
         </Link>
       </div>
 

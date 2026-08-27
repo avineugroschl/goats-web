@@ -208,7 +208,7 @@ export default function CourtForm({
               alt="G.O.A.T.S"
               className="h-8 w-8 rounded-lg"
             />
-            <span className="font-display text-sm font-bold text-white">
+            <span className="wordmark text-sm text-white">
               G.O.A.T.S
             </span>
           </Link>

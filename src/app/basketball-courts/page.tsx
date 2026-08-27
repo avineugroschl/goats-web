@@ -53,7 +53,7 @@ export default async function BasketballCourtsIndex() {
         <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/app-icon.png" alt="G.O.A.T.S" className="h-8 w-8 rounded-lg" />
-          <span className="text-2xl font-bold">G.O.A.T.S</span>
+          <span className="wordmark text-base">G.O.A.T.S</span>
         </Link>
       </div>
 
