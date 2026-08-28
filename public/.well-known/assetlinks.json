@@ -1,0 +1,16 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.goats.app",
+      "sha256_cert_fingerprints": [
+        "21:18:71:5F:88:FB:00:1E:1F:19:B9:D1:DF:97:36:AB:14:68:D7:9A:5E:AC:7C:5D:89:EC:24:73:A4:08:2F:0D",
+        "12:93:B4:8F:E5:CC:2E:55:80:C5:84:6A:50:CE:B0:25:76:6F:D2:69:C9:08:87:44:E4:A7:EB:DB:79:13:28:35"
+      ]
+    }
+  }
+]
