@@ -799,6 +799,18 @@ function CommentsPanel() {
 
 // Website "Edits, thoughts, or comments?" submissions from court pages.
 // Newest first; mark resolved (kept for the record) or delete outright.
+// Canonical tag keys written by the in-app "Suggest a court update" form,
+// mapped to display labels. Keep in sync with iOS/Android CourtUpdateTag.
+const FEEDBACK_TAG_LABELS: Record<string, string> = {
+  hours: "Hours",
+  hoops_nets: "Hoops & nets",
+  access: "Access or closed",
+  photo: "Photo outdated",
+  amenities: "Amenities",
+  busyness: "Busyness",
+  other: "Other",
+};
+
 function FeedbackPanel() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [items, setItems] = useState<any[]>([]);
@@ -860,9 +872,24 @@ function FeedbackPanel() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1.5 whitespace-pre-wrap text-sm text-white/80">{f.message}</p>
+                  {Array.isArray(f.tags) && f.tags.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {f.tags.map((t: string) => (
+                        <span
+                          key={t}
+                          className="rounded-full bg-teal/15 px-2 py-0.5 text-[10px] font-semibold text-teal"
+                        >
+                          {FEEDBACK_TAG_LABELS[t] || t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {f.message && (
+                    <p className="mt-1.5 whitespace-pre-wrap text-sm text-white/80">{f.message}</p>
+                  )}
                   <p className="mt-2 text-xs text-white/30">
-                    {f.email ? <span className="text-white/50">{f.email}</span> : "No email"} ·{" "}
+                    {f.platform ? <span className="uppercase">{f.platform}</span> : "web"} ·{" "}
+                    {f.email ? <span className="text-white/50">{f.email}</span> : "no email"} ·{" "}
                     {formatTs(f.createdAt)}
                   </p>
                 </div>
