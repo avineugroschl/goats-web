@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
+import { sameValue } from "@/lib/corrections";
 import type { ReviewFeedback, Verdict } from "@/lib/corrections";
 
 
@@ -85,6 +86,8 @@ type Judge = {
   note: string;
   /** value differs from what the pipeline proposed — with ✓ this is the "close" case */
   changed: boolean;
+  /** what the pipeline proposed, shown under the input once the value moves away from it */
+  was: unknown;
   set: (f: string, v: Verdict) => void;
   setNote: (f: string, note: string) => void;
 };
@@ -118,6 +121,11 @@ function VerdictMark({ j }: { j: Judge }) {
           close
         </span>
       )}
+      {on("wrong") && j.changed && (
+        <span className="rounded bg-teal/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-teal">
+          fixed
+        </span>
+      )}
       <button
         type="button"
         title={on("confirmed") ? "clear" : "correct"}
@@ -138,20 +146,47 @@ function VerdictMark({ j }: { j: Judge }) {
   );
 }
 
-/** Note line under a judged field. Hidden until there is a verdict, so the card stays readable. */
+/**
+ * Note line under a judged field. Hidden until there is a verdict, so the card stays readable.
+ *
+ * The prompt used to ask "wrong. what's right?", which read as though the correct answer
+ * belonged in this box. It does not. The field above is the answer and is what publishes;
+ * this is only for anything the value itself cannot say.
+ */
 function FieldNote({ j }: { j: Judge }) {
   if (j.verdict === "untouched") return null;
-  const prompt = j.verdict === "wrong"
-    ? "wrong. what's right?"
-    : j.changed ? "what did you fix?" : "add a note";
   return (
     <div className="mt-1 pl-3">
-      <span className="text-[10px] text-dash-text-muted/70">↳ {prompt}</span>
+      <span className="text-[10px] text-dash-text-muted/70">↳ optional. anything worth knowing</span>
       <input
         className="mt-0.5 w-full rounded-lg border border-dash-border bg-dash-bg px-2 py-1 text-xs text-dash-text"
         value={j.note}
         onChange={(e) => j.setNote(j.f, e.target.value)}
       />
+    </div>
+  );
+}
+
+/**
+ * What the pipeline originally said, under any field you have moved away from it.
+ *
+ * `pipelineReview.predicted` has been frozen on the card since it was written and no edit
+ * can reach it, so the original was never actually lost — it just had nowhere to appear.
+ * Without it the only trace of a change was the "close" chip, which needs a ✓ to show at
+ * all, so crossing a field out and fixing it left you with no way to see what you fixed.
+ */
+function WasHint({ j }: { j: Judge }) {
+  if (!j.changed) return null;
+  const v = j.was;
+  const text =
+    v === null || v === undefined || String(v).trim() === ""
+      ? "(blank)"
+      : typeof v === "boolean"
+        ? (v ? "has lights" : "no lights")
+        : String(v);
+  return (
+    <div className="pl-3 text-[10px] leading-relaxed text-dash-text-muted/70" title={text}>
+      was {text.length > 140 ? `${text.slice(0, 140)}…` : text}
     </div>
   );
 }
@@ -166,6 +201,7 @@ function Field({ label, children, conf, judge }: {
         {judge && <VerdictMark j={judge} />}
       </span>
       {children}
+      {judge && <WasHint j={judge} />}
       {judge && <FieldNote j={judge} />}
     </div>
   );
@@ -188,9 +224,57 @@ export default function PendingCourtCard({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const rv = court.pipelineReview;
-  const set = <K extends keyof ReviewCourt>(k: K, v: ReviewCourt[K]) => { setD((p) => ({ ...p, [k]: v })); setDirty(true); };
+  // Autosave must not fire on mount, or simply opening the queue would rewrite every card.
+  const dDirty = useRef(false);
+  /**
+   * Replacing a value IS the correction. Nothing else has to be tapped.
+   *
+   * The field is where the fix goes and what gets published, so requiring a ✗ on top of it
+   * meant a fixed value with no tap scored as `untouched`, which is the bucket for "nobody
+   * looked". The single strongest piece of evidence in the whole card was being thrown away
+   * for not being announced twice.
+   *
+   * Recorded as via:"edit" so it stays separable from a deliberate tap, the same way bulk
+   * does. Tap ✓ afterwards if the pipeline was close and you only nudged it. Putting the
+   * value back the way it was clears a mark this made, and never one you made yourself.
+   */
+  const set = <K extends keyof ReviewCourt>(k: K, v: ReviewCourt[K]) => {
+    dDirty.current = true; setD((p) => ({ ...p, [k]: v })); setDirty(true);
+    if (!canJudge || !JUDGE_KEYS.includes(k as string)) return;
+    const f = k as string;
+    const moved = !sameValue(f, previousOf(f), v);
+    fbDirty.current = true;
+    setFb((p) => {
+      const fields = { ...(p.fields ?? {}) };
+      const cur = fields[f];
+      if (moved) {
+        if (cur?.verdict) return p;                        // your own judgement stands
+        fields[f] = { ...(cur ?? {}), verdict: "wrong", via: "edit" };
+      } else {
+        if (cur?.via !== "edit") return p;                 // only ever undo our own inference
+        const note = cur.note;
+        if (note) fields[f] = { note }; else delete fields[f];
+      }
+      return { ...p, fields };
+    });
+  };
 
   const photo = d.photoUrlCard || d.photoUrl || "";
+
+  /**
+   * Built from the pin as it stands, not from the link stored at discovery.
+   *
+   * `pipelineReview.mapsLink` is a string frozen when the court was selected. It matched
+   * the card everywhere it was checked, but it cannot follow an edit, so the one time it
+   * went stale was the exact moment you were using it: nudging a bad pin and looking again.
+   */
+  const satelliteLink = useMemo(() => {
+    const la = Number(d.latitude), ln = Number(d.longitude);
+    if (Number.isFinite(la) && Number.isFinite(ln) && (la || ln)) {
+      return `https://www.google.com/maps/@${la},${ln},80m/data=!3m1!1e3`;
+    }
+    return rv?.mapsLink || "";
+  }, [d.latitude, d.longitude, rv]);
   const intelEntries = useMemo(() => Object.entries(rv?.localIntel ?? {}), [rv]);
 
   // ── per-field verdicts ────────────────────────────────────────────────────
@@ -206,20 +290,16 @@ export default function PendingCourtCard({
    * "you edited this in this sitting" — weaker, but honest and never wrong in the
    * direction that invents a correction.
    */
-  const changedFrom = useCallback((f: string): boolean => {
+  const previousOf = useCallback((f: string): unknown => {
     const p = rv?.predicted;
-    const before = p && p[f] !== undefined ? p[f] : (court as unknown as Record<string, unknown>)[f];
-    const now = (d as unknown as Record<string, unknown>)[f];
-    if (f === "latitude" || f === "longitude") {
-      const a = Number(before), b = Number(now);
-      if (!Number.isFinite(a) || !Number.isFinite(b)) return a !== b;
-      return Math.abs(a - b) >= 0.0001;      // ~11m, so re-typing 40.712776 isn't a correction
-    }
-    if (typeof before === "string" || typeof now === "string") {
-      return String(before ?? "").trim().toLowerCase() !== String(now ?? "").trim().toLowerCase();
-    }
-    return (before ?? null) !== (now ?? null);
-  }, [rv, court, d]);
+    return p && p[f] !== undefined ? p[f] : (court as unknown as Record<string, unknown>)[f];
+  }, [rv, court]);
+
+  // sameValue is the comparator the stored correction uses, so the hint on the card and
+  // the `agreed` flag in the dashboard can never disagree about what counts as a change.
+  const changedFrom = useCallback((f: string): boolean =>
+    !sameValue(f, previousOf(f), (d as unknown as Record<string, unknown>)[f]),
+  [previousOf, d]);
 
   const setVerdict = useCallback((f: string, v: Verdict, via: "individual" | "bulk" = "individual") => {
     fbDirty.current = true;
@@ -271,6 +351,25 @@ export default function PendingCourtCard({
     return () => clearTimeout(t);
   }, [fb, court.id]);
 
+  /**
+   * Field values autosave too, on the same debounce as the verdicts.
+   *
+   * They used to wait behind the Save button while the ✓/✗ saved themselves, and that split
+   * was the one real way to lose work: fix a value, tick it wrong, navigate away, and the
+   * tick survived while the fix did not, leaving a card marked wrong that still showed the
+   * wrong value. Approve always published the in-memory draft, so this only ever bit you on
+   * the way out.
+   *
+   * Gated to a pending card. An approved one has already been copied into `courts`, so
+   * quietly rewriting its draft would put the two permanently out of step.
+   */
+  useEffect(() => {
+    if (!dDirty.current || court.status !== "pending") return;
+    const t = setTimeout(() => { save(); }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d, court.status]);
+
   // Only a pipeline draft still awaiting a decision can be judged. A hand-submitted court
   // has no prediction to be right or wrong about, and an already-approved one had its
   // correction written at approval — offering ✓/✗ on either would collect taps that go
@@ -282,9 +381,10 @@ export default function PendingCourtCard({
     verdict: fb.fields?.[f]?.verdict ?? "untouched",
     note: fb.fields?.[f]?.note ?? "",
     changed: changedFrom(f),
+    was: previousOf(f),
     set: setVerdict,
     setNote: setFieldNote,
-  }) : undefined, [canJudge, fb, changedFrom, setVerdict, setFieldNote]);
+  }) : undefined, [canJudge, fb, changedFrom, previousOf, setVerdict, setFieldNote]);
 
 
   const judgedCount = JUDGE_KEYS.filter((f) => fb.fields?.[f]?.verdict).length;
@@ -331,8 +431,8 @@ export default function PendingCourtCard({
           <div>
             <h3 className="text-lg font-semibold text-white">{d.name || "Unnamed"}</h3>
             <p className="text-sm text-white/40">{d.address}</p>
-            {rv?.mapsLink && (
-              <a href={rv.mapsLink} target="_blank" rel="noreferrer" className="text-xs text-teal hover:underline">
+            {satelliteLink && (
+              <a href={satelliteLink} target="_blank" rel="noreferrer" className="text-xs text-teal hover:underline">
                 Open satellite ↗
               </a>
             )}

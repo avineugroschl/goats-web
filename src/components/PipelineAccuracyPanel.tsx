@@ -28,6 +28,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { mergeCorrections } from "@/lib/corrections";
 
 const MIN_SAMPLES = 5;          // below this, show the count and no percentage
 const ROLL_WINDOW = 30;         // trailing verdicts behind the responsive line
@@ -57,6 +58,8 @@ type Stats = {
   per: Record<string, FieldStat>;
   fields: string[]; judged: number; total: number;
   batches: number[]; cards: number; approved: number;
+  /** whole-card notes, which belong to no field and so had nowhere to be shown */
+  cardNotes: { note: string; court: string; batch: unknown; provisional: boolean }[];
 };
 
 type FieldRow = {
@@ -66,6 +69,8 @@ type FieldRow = {
 type Corr = {
   id: string; courtId?: string; courtName?: string; batch?: number | string;
   outcome?: string; fields?: FieldRow[]; cardNote?: string | null;
+  /** derived from a card still in review rather than read from pipeline_corrections */
+  provisional?: boolean;
   claims?: Record<string, Record<string, unknown>> | null;
   claimSources?: Record<string, Record<string, string[]>> | null;
   createdAt?: { seconds?: number } | null;
@@ -90,18 +95,32 @@ const batchNum = (b: unknown) => (Number.isFinite(Number(b)) ? Number(b) : 0);
 
 export default function PipelineAccuracyPanel() {
   const [rows, setRows] = useState<Corr[] | null>(null);
+  const [meta, setMeta] = useState({ provisional: 0, hiddenWithVerdicts: 0, unmarkedEdits: 0 });
   const [openField, setOpenField] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const snap = await getDocs(collection(db, "pipeline_corrections"));
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Corr));
-      // Batch order, then write order inside a batch. The rolling window depends on this
-      // being the sequence the reviews actually happened in.
+      // Two reads, one merge rule. Approving or rejecting is what freezes a correction, but
+      // a ✓ is evidence the moment it is tapped, and a queue worked over several sittings
+      // used to look from here exactly like a queue nobody had opened. mergeCorrections
+      // owns which row wins so this panel and the Mac pipeline cannot answer it differently.
+      const [stored, pending] = await Promise.all([
+        getDocs(collection(db, "pipeline_corrections")),
+        getDocs(collection(db, "pending_courts")),
+      ]);
+      const { rows: merged, provisional, hiddenWithVerdicts, unmarkedEdits } = mergeCorrections(
+        stored.docs.map((d) => ({ id: d.id, ...d.data() })),
+        pending.docs.map((d) => ({ id: d.id, ...d.data() })),
+      );
+      const list = merged as unknown as Corr[];
+      // Batch order, then decided rows before in-review ones, then write order. The rolling
+      // window depends on this being the sequence the reviews actually happened in.
       list.sort((a, b) =>
         batchNum(a.batch) - batchNum(b.batch) ||
+        Number(!!a.provisional) - Number(!!b.provisional) ||
         (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0));
       setRows(list);
+      setMeta({ provisional, hiddenWithVerdicts, unmarkedEdits });
     })().catch((e) => { console.warn("corrections load failed:", e); setRows([]); });
   }, []);
 
@@ -113,24 +132,30 @@ export default function PipelineAccuracyPanel() {
     for (const f of fields) per[f] = { confirmed: 0, wrong: 0, close: 0, untouched: 0, seq: [], notes: [], bulk: 0 };
 
     const batches = new Set<number>();
+    const cardNotes: Stats["cardNotes"] = [];
     for (const r of rows) {
       batches.add(batchNum(r.batch));
+      if (r.cardNote) cardNotes.push({ note: r.cardNote, court: r.courtName ?? "?", batch: r.batch, provisional: !!r.provisional });
       for (const fr of r.fields ?? []) {
         const p = per[fr.field];
         if (!p) continue;
         const v = fr.verdict ?? "untouched";
+        // Collected before the untouched short-circuit: clearing a ✓ keeps the note you
+        // typed under it, and a note you bothered to write is the most useful thing on the
+        // whole card. Dropping it here was silent.
+        if (fr.note) p.notes.push({ note: fr.note, court: r.courtName ?? "?", batch: r.batch, verdict: v });
         if (v === "untouched") { p.untouched++; continue; }
         if (v === "confirmed") { p.confirmed++; if (fr.agreed === false) p.close++; }
         else p.wrong++;
         if (fr.via === "bulk") p.bulk++;
         p.seq.push({ batch: batchNum(r.batch), ok: v === "confirmed" });
-        if (fr.note) p.notes.push({ note: fr.note, court: r.courtName ?? "?", batch: r.batch, verdict: v });
       }
     }
     const judged = fields.reduce((n, f) => n + per[f].confirmed + per[f].wrong, 0);
     const total = fields.reduce((n, f) => n + per[f].confirmed + per[f].wrong + per[f].untouched, 0);
     return { per, fields, judged, total, batches: [...batches].sort((a, b) => a - b),
-             cards: rows.length, approved: rows.filter((r) => r.outcome === "approved").length };
+             cards: rows.length, approved: rows.filter((r) => r.outcome === "approved").length,
+             cardNotes };
   }, [rows]);
 
   if (!rows) return <div className="py-12 text-center text-sm text-dash-text-muted">Loading…</div>;
@@ -140,10 +165,11 @@ export default function PipelineAccuracyPanel() {
       <div className="space-y-6">
       <LearningPanel />
       <div className="rounded-xl border border-dash-border bg-dash-bg p-6 text-sm text-dash-text-muted">
-        <p className="text-dash-text">Nothing reviewed yet.</p>
+        <p className="text-dash-text">Nothing checked yet.</p>
         <p className="mt-2">
-          Approve or reject a draft court in Pending Courts and it shows up here. Tick or cross
-          the fields as you go, since only fields you actually judge count toward accuracy.
+          Tick or cross a field on any draft court in Pending Courts and it shows up here.
+          You do not have to approve or reject the card first. Only fields you actually
+          judge count toward accuracy, so an untouched one is never scored as correct.
         </p>
       </div>
       </div>
@@ -167,8 +193,10 @@ export default function PipelineAccuracyPanel() {
           <div className="text-xs text-dash-text-muted">
             <div><span className="text-dash-text">{s.judged}</span> of {s.total} fields judged</div>
             <div className="mt-0.5">
-              across <span className="text-dash-text">{s.cards}</span> reviewed card
-              {s.cards === 1 ? "" : "s"} · {s.approved} approved · {s.batches.filter(Boolean).length} batch
+              across <span className="text-dash-text">{s.cards}</span> checked card
+              {s.cards === 1 ? "" : "s"} · {s.approved} approved
+              {meta.provisional > 0 ? ` · ${meta.provisional} still in review` : ""}
+              {" · "}{s.batches.filter(Boolean).length} batch
               {s.batches.filter(Boolean).length === 1 ? "" : "es"}
             </div>
           </div>
@@ -177,6 +205,28 @@ export default function PipelineAccuracyPanel() {
           Unjudged fields are left out of every accuracy figure below rather than counted as
           correct. That is the whole point of the checks: an untouched field is not evidence.
         </p>
+        {meta.provisional > 0 && (
+          <p className="mt-2 text-[11px] leading-relaxed text-dash-text-muted/80">
+            {meta.provisional} of these {meta.provisional === 1 ? "is a card" : "are cards"} you
+            have marked up but not decided yet. Those count from the moment you tick them, and
+            they keep tracking the card, so changing a mark or fixing a value updates this page.
+            Approving freezes the card as it stands.
+          </p>
+        )}
+        {meta.unmarkedEdits > 0 && (
+          <p className="mt-2 text-[11px] leading-relaxed text-coral/80">
+            {meta.unmarkedEdits} field{meta.unmarkedEdits === 1 ? " has" : "s have"} a value you
+            changed but no ✓ or ✗, so {meta.unmarkedEdits === 1 ? "it is" : "they are"} not
+            counted. Open the card and mark {meta.unmarkedEdits === 1 ? "it" : "them"}.
+          </p>
+        )}
+        {meta.hiddenWithVerdicts > 0 && (
+          <p className="mt-2 text-[11px] leading-relaxed text-coral/80">
+            {meta.hiddenWithVerdicts} hidden card
+            {meta.hiddenWithVerdicts === 1 ? " carries checks that are" : "s carry checks that are"} not
+            counted here. Hiding a card takes it out of the queue and out of the numbers.
+          </p>
+        )}
       </div>
 
       {/* per-field small multiples */}
@@ -221,6 +271,26 @@ export default function PipelineAccuracyPanel() {
       </div>
 
       {openField && <FieldDetail field={openField} rows={rows} stats={s} />}
+
+      {/* Notes about a whole card. Captured since the feedback pass shipped, stored on every
+          correction, and until now rendered nowhere, which made them look like a black hole. */}
+      {s.cardNotes.length > 0 && (
+        <div className="rounded-xl border border-dash-border bg-dash-bg p-5">
+          <div className="mb-3 text-[11px] uppercase tracking-wider text-dash-text-muted">
+            Notes on cards ({s.cardNotes.length})
+          </div>
+          <div className="space-y-2">
+            {s.cardNotes.slice().reverse().map((n, i) => (
+              <div key={i} className="rounded-lg bg-dash-surface p-3 text-xs">
+                <span className="text-dash-text">{n.note}</span>
+                <div className="mt-1 text-[10px] text-dash-text-muted">
+                  {n.court}{n.batch ? ` · batch ${n.batch}` : ""}{n.provisional ? " · still in review" : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -280,7 +350,9 @@ function FieldDetail({ field, rows, stats }: { field: string; rows: Corr[]; stat
     const src: Record<string, { r: number; n: number }> = {};
     if (!botField) return { byBot: bot, bySource: src };
     for (const r of rows) {
-      if (r.outcome !== "approved") continue;
+      // in_review rows carry the card's currently saved values, which is exactly what would
+      // be published, so a bot is just as gradable against them as against an approval.
+      if (r.outcome !== "approved" && r.outcome !== "in_review") continue;
       const fr = (r.fields ?? []).find((x) => x.field === field);
       if (!fr || !fr.verdict || fr.verdict === "untouched") continue;
       const claims = r.claims?.[botField] ?? {};
