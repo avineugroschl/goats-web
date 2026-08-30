@@ -81,6 +81,14 @@ function jobPct(j: Job): number {
 }
 const ACTIVE = ["queued", "discovering", "processing", "awaiting_chatbots", "needs_review"];
 
+const US_STATES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "IA", "ID", "IL",
+  "IN", "KS", "KY", "LA", "MA", "MD", "ME", "MI", "MN", "MO", "MS", "MT", "NC", "ND", "NE",
+  "NH", "NJ", "NM", "NV", "NY", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT",
+  "VA", "VT", "WA", "WI", "WV", "WY",
+];
+
+
 export default function PipelineControls() {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -93,6 +101,9 @@ export default function PipelineControls() {
   const [findLoc, setFindLoc] = useState("");
   const [findN, setFindN] = useState(5);
   const [findIndoor, setFindIndoor] = useState(false);
+  const [source, setSource] = useState("500");
+  const [stateFilter, setStateFilter] = useState("");
+  const [pools, setPools] = useState<Record<string, { total?: number; remaining?: number }>>({});
 
   useEffect(() => {
     const q = query(collection(db, "pipeline_jobs"), orderBy("createdAt", "desc"), limit(12));
@@ -100,6 +111,26 @@ export default function PipelineControls() {
       setJobs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Job)))
     );
   }, []);
+
+  // How much of each source list is left. Only the Mac can know this — the registry of every
+  // court ever picked lives there — so select.js publishes it after each run. Live, because
+  // the number changes the moment a batch is seeded.
+  useEffect(() =>
+    onSnapshot(doc(db, "pipeline_learning", "state"),
+      (d) => setPools((d.data()?.pools ?? {}) as Record<string, { total?: number; remaining?: number }>),
+      () => setPools({})),
+  []);
+
+  // "· 232 left" once we've heard from the Mac, otherwise just the total, otherwise nothing.
+  // Never guesses: a fabricated count on a control that spends real time is worse than none.
+  function poolLabel(key: string) {
+    const p = pools[key];
+    if (!p) return "";
+    if (typeof p.remaining === "number") return ` · ${p.remaining.toLocaleString()} left`;
+    if (typeof p.total === "number") return ` · ${p.total.toLocaleString()}`;
+    return "";
+  }
+
 
   // A pipeline run is genuinely in-flight while any job is in an ACTIVE status.
   // `busy` only covers the ~1s enqueue write; `running` is the real "don't start
@@ -121,11 +152,13 @@ export default function PipelineControls() {
     try {
       await clearFinished();
       await addDoc(collection(db, "pipeline_jobs"), {
-        action: "run_batch", n: 10, source: "500",
+        action: "run_batch", n: 10, source,
+        ...(stateFilter ? { state: stateFilter } : {}),
         status: "queued", createdBy: user?.uid ?? null, createdAt: serverTimestamp(),
       });
     } finally { setBusy(false); }
   }
+
 
   async function findCourts() {
     if (running || !findLoc.trim()) return;
@@ -167,6 +200,30 @@ export default function PipelineControls() {
   return (
     <div className="mb-6 rounded-xl border border-dash-border bg-dash-surface p-4">
       <div className="flex flex-wrap items-center gap-3">
+        {/* Which list the next batch is drawn from. The curated one runs out; the OSM one
+            does not, but its courts are far less notable and many have placeholder names
+            like "Court at Hazen Street". Remaining counts come from the Mac (select.js
+            publishes them) because the registry of everything ever picked lives only there. */}
+        <select
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          disabled={running}
+          title="Which list the next batch is drawn from"
+          className="rounded-lg border border-dash-border bg-dash-bg px-3 py-2 text-sm text-dash-text disabled:opacity-50"
+        >
+          <option value="500">Notable courts{poolLabel("500")}</option>
+          <option value="99k">All US courts{poolLabel("99k")}</option>
+        </select>
+        <select
+          value={stateFilter}
+          onChange={(e) => setStateFilter(e.target.value)}
+          disabled={running}
+          title="Only pick courts in this state"
+          className="rounded-lg border border-dash-border bg-dash-bg px-3 py-2 text-sm text-dash-text disabled:opacity-50"
+        >
+          <option value="">Any state</option>
+          {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
         <button
           onClick={runBatch}
           disabled={running}
@@ -174,6 +231,7 @@ export default function PipelineControls() {
         >
           + Load more draft courts
         </button>
+
         <button
           onClick={() => setShowAdd((s) => !s)}
           disabled={running}
