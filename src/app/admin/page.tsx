@@ -27,6 +27,7 @@ import { useAuth } from "@/lib/auth-context";
 import { OperatorApplication, NewCourtData } from "@/lib/types";
 import PipelineControls from "@/components/PipelineControls";
 import PendingCourtCard, { ReviewCourt } from "@/components/PendingCourtCard";
+import { logPipelineCorrections } from "@/lib/corrections";
 
 type AdminTab = "applications" | "courts" | "liveCourts" | "dashboard" | "ambassadors";
 type DashTab = "comments" | "feedback" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators";
@@ -410,6 +411,7 @@ interface PendingCourt {
 }
 
 function PendingCourtsTab() {
+  const { user } = useAuth();
   const [courts, setCourts] = useState<PendingCourt[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -457,7 +459,7 @@ function PendingCourtsTab() {
     setActionLoading(court.id);
     try {
       const newCourtRef = doc(collection(db, "courts"));
-      await setDoc(newCourtRef, {
+      const liveCourt = {
         name: court.name,
         address: court.address,
         latitude: court.latitude || 0,
@@ -477,13 +479,23 @@ function PendingCourtsTab() {
         photoUrlFull: court.photoUrlFull || "",
         activeUserIds: [],
         geofenceRadiusMeters: 100,
-      });
+      };
+      await setDoc(newCourtRef, liveCourt);
 
       await updateDoc(doc(db, "pending_courts", court.id), {
         status: "approved",
         approvedAt: serverTimestamp(),
         approvedCourtId: newCourtRef.id,
       });
+
+      // Ground truth: what you approved vs what the pipeline proposed. Non-fatal on purpose —
+      // a failed corrections write must never block or undo an approval.
+      logPipelineCorrections(
+        court as unknown as Record<string, unknown>,
+        { ...liveCourt, __newCourtId: newCourtRef.id },
+        "approved",
+        user?.uid ?? null,
+      ).catch((e) => console.warn("corrections log failed (non-fatal):", e));
 
       setCourts((prev) => prev.map((c) => c.id === court.id ? { ...c, status: "approved" } : c));
     } catch (err) {
@@ -501,6 +513,15 @@ function PendingCourtsTab() {
         status: "rejected",
         rejectedAt: serverTimestamp(),
       });
+
+      // A rejection is the strongest signal there is: the pipeline proposed a court that
+      // shouldn't exist. Log it against the same per-bot claims as an approval.
+      const rejected = courts.find((c) => c.id === courtId);
+      if (rejected) {
+        logPipelineCorrections(
+          rejected as unknown as Record<string, unknown>, null, "rejected", user?.uid ?? null,
+        ).catch((e) => console.warn("corrections log failed (non-fatal):", e));
+      }
       setCourts((prev) => prev.map((c) => c.id === courtId ? { ...c, status: "rejected" } : c));
     } finally {
       setActionLoading(null);

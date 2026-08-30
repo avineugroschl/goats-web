@@ -21,6 +21,14 @@ type Review = {
   localIntel?: Record<string, string>;
   vision?: { hoops?: number | null; layout?: string; confidence?: string; notes?: string };
   source?: string;
+  // written by write_pending.js but never rendered until now
+  confidence?: string;
+  flagged?: boolean;
+  reviewFlag?: string | null;
+  reviewerNotes?: string | null;
+  fieldConfidence?: Record<string, string | null>;
+  // per-bot verdict on whether the stored address/coordinates match the court they researched
+  location?: { disputed?: number; checked?: number; confidence?: string; by_model?: Record<string, string> };
 };
 
 export type ReviewCourt = {
@@ -129,13 +137,30 @@ export default function PendingCourtCard({
             )}
           </div>
         </div>
-        {rv?.source && <span className="rounded bg-dash-bg px-2 py-0.5 text-[10px] text-dash-text-muted">{rv.source}</span>}
+        <div className="flex shrink-0 items-center gap-2">
+          {rv?.location?.confidence === "RED" && (
+            <span className="rounded bg-coral/20 px-2 py-0.5 text-[10px] font-semibold text-coral">
+              address disputed {rv.location.disputed}/{rv.location.checked}
+            </span>
+          )}
+          {rv?.source && <span className="rounded bg-dash-bg px-2 py-0.5 text-[10px] text-dash-text-muted">{rv.source}</span>}
+        </div>
       </div>
+
+      {/* Why the pipeline could not confirm this court. write_pending sets reviewFlag for a
+          bad pin, an unconfirmed hoop count, or a disputed address; without this the card
+          looked identical to a fully verified one. */}
+      {rv?.flagged && rv?.reviewFlag && (
+        <div className="mb-4 rounded-xl border border-coral/40 bg-coral/10 p-3">
+          <div className="font-display text-[11px] font-bold uppercase tracking-wider text-coral">Needs a look before publishing</div>
+          <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-dash-text">{rv.reviewFlag}</p>
+        </div>
+      )}
 
       {/* editable fields */}
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <Field label="Name"><input className={inputCls} value={d.name} onChange={(e) => set("name", e.target.value)} /></Field>
-        <Field label="Address"><input className={inputCls} value={d.address} onChange={(e) => set("address", e.target.value)} /></Field>
+        <Field label="Address" conf={rv?.fieldConfidence?.location ?? undefined}><input className={inputCls} value={d.address} onChange={(e) => set("address", e.target.value)} /></Field>
         <Field label="Latitude"><input type="number" step="any" className={inputCls} placeholder="e.g. 40.712776" value={d.latitude ?? ""} onChange={(e) => set("latitude", e.target.value === "" ? undefined : Number(e.target.value))} /></Field>
         <Field label="Longitude"><input type="number" step="any" className={inputCls} placeholder="e.g. -74.005974" value={d.longitude ?? ""} onChange={(e) => set("longitude", e.target.value === "" ? undefined : Number(e.target.value))} /></Field>
         <Field label="Baskets (hoops)" conf={rv?.hoops?.confidence}>
@@ -158,10 +183,10 @@ export default function PendingCourtCard({
             <input type="checkbox" checked={!!d.hasLights} onChange={(e) => set("hasLights", e.target.checked)} /> has lights
           </label>
         </Field>
-        <Field label="Condition"><input className={inputCls} value={d.courtCondition} onChange={(e) => set("courtCondition", e.target.value)} /></Field>
-        <Field label="3PT line"><input className={inputCls} value={d.threePointLine} onChange={(e) => set("threePointLine", e.target.value)} /></Field>
-        <Field label="Hours"><input className={inputCls} placeholder="blank if unverified" value={d.hoursOfOperation} onChange={(e) => set("hoursOfOperation", e.target.value)} /></Field>
-        <Field label="Phone"><input className={inputCls} placeholder="blank if unverified" value={d.phoneNumber} onChange={(e) => set("phoneNumber", e.target.value)} /></Field>
+        <Field label="Condition" conf={rv?.fieldConfidence?.surface ?? undefined}><input className={inputCls} value={d.courtCondition} onChange={(e) => set("courtCondition", e.target.value)} /></Field>
+        <Field label="3PT line" conf={rv?.fieldConfidence?.threePoint ?? undefined}><input className={inputCls} value={d.threePointLine} onChange={(e) => set("threePointLine", e.target.value)} /></Field>
+        <Field label="Hours" conf={rv?.fieldConfidence?.hours ?? undefined}><input className={inputCls} placeholder="blank if unverified" value={d.hoursOfOperation} onChange={(e) => set("hoursOfOperation", e.target.value)} /></Field>
+        <Field label="Phone" conf={rv?.fieldConfidence?.phone ?? undefined}><input className={inputCls} placeholder="blank if unverified" value={d.phoneNumber} onChange={(e) => set("phoneNumber", e.target.value)} /></Field>
         <Field label="Booking link"><input className={inputCls} placeholder="blank = no Book button" value={d.bookingUrl ?? ""} onChange={(e) => set("bookingUrl", e.target.value)} /></Field>
       </div>
 
@@ -192,7 +217,23 @@ export default function PendingCourtCard({
               </span>
             </div>
           )}
+          {rv.location?.by_model && Object.keys(rv.location.by_model).length > 0 && (
+            <div>
+              <div className="text-dash-text-muted">
+                Address check ({rv.location.disputed ?? 0} of {rv.location.checked ?? 0} disputed)
+              </div>
+              {Object.entries(rv.location.by_model).map(([bot, verdict]) => {
+                const ok = /^\s*ok\b/i.test(verdict ?? "");
+                return (
+                  <div key={bot} className={ok ? "text-dash-text-muted" : "text-coral"}>
+                    <span className="font-semibold">{bot}:</span> {verdict}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {rv.vision?.notes && <div><span className="text-dash-text-muted">Vision: </span><span className="text-dash-text">{rv.vision.notes}</span></div>}
+          {rv.reviewerNotes && <div><span className="text-dash-text-muted">Reviewer: </span><span className="text-dash-text">{rv.reviewerNotes}</span></div>}
           {intelEntries.map(([bot, txt]) => (
             <div key={bot}>
               <div className="font-semibold text-dash-text">{bot}</div>

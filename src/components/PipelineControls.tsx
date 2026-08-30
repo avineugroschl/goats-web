@@ -29,6 +29,9 @@ type Job = {
   pct?: number;           // live progress written by the listener during review
   reviewed?: number;      // courts finished so far in the review
   reviewTotal?: number;   // courts in the batch
+  botsCounted?: number;   // bots whose answers the parser could actually read
+  botsTotal?: number;     // bots that answered at all
+  botsDead?: string | null; // comma-joined names of bots that parsed to nothing
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -265,6 +268,18 @@ export default function PipelineControls() {
                     {j.status === "cards_ready" && j.pendingCount != null ? ` — ${j.pendingCount} carded` : ""}
                     {j.error ? ` — ${j.error}` : ""}
                   </span>
+                  {/* A bot whose answer the parser couldn't read contributes no votes, and the
+                      thin result is otherwise invisible. Call it out on the finished row. */}
+                  {j.botsTotal != null && (
+                    <span
+                      title={j.botsDead ? `No usable answer from: ${j.botsDead}` : "All bots parsed"}
+                      className={`rounded px-1.5 py-0.5 text-[10px] ${
+                        j.botsCounted === j.botsTotal ? "text-dash-text-muted" : "bg-coral/20 text-coral"
+                      }`}
+                    >
+                      {j.botsCounted}/{j.botsTotal} bots
+                    </span>
+                  )}
                   <span className="ml-auto text-dash-text-muted">{pct}%</span>
                   <button
                     onClick={() => clearJob(j.id)}
