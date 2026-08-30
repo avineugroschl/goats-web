@@ -32,6 +32,8 @@ type Job = {
   botsCounted?: number;   // bots whose answers the parser could actually read
   botsTotal?: number;     // bots that answered at all
   botsDead?: string | null; // comma-joined names of bots that parsed to nothing
+  // what the self-improvement pass did before this batch was built; most runs find nothing
+  learning?: { examples?: string; improve?: string };
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -46,6 +48,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const STAGE_LABEL: Record<string, string> = {
+  learning: "learning from reviewed cards",
   seeded: "picked courts",
   screenshot_done: "captured satellite",
   bots_pending: "awaiting chatbots",
@@ -59,7 +62,7 @@ const STAGE_LABEL: Record<string, string> = {
 
 // rough % complete by stage (falls back to status)
 const STAGE_PCT: Record<string, number> = {
-  seeded: 15, screenshot_done: 35, bots_pending: 50, awaiting_review: 72,
+  learning: 2, seeded: 15, screenshot_done: 35, bots_pending: 50, awaiting_review: 72,
   bots_ingested: 82, carded: 100, review_timeout: 100,
 };
 const STATUS_PCT: Record<string, number> = {
@@ -296,6 +299,16 @@ export default function PipelineControls() {
                     style={{ width: `${pct}%` }}
                   />
                 </div>
+                {/* What the self-improvement pass did before this batch was built. Shown even
+                    when it did nothing: a line that only appears on the rare batch that
+                    changed something is indistinguishable from a pass that stopped running. */}
+                {j.learning?.improve && (
+                  <div className="mt-1 text-[10px] leading-relaxed text-dash-text-muted/70">
+                    <span className="text-dash-text-muted">learned:</span> {j.learning.improve}
+                    {j.learning.examples && !j.learning.examples.startsWith("No corrections")
+                      ? ` · ${j.learning.examples}` : ""}
+                  </div>
+                )}
               </div>
             );
           })}

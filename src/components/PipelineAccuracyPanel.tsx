@@ -26,7 +26,7 @@
  * off three samples is worse than a blank.
  */
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const MIN_SAMPLES = 5;          // below this, show the count and no percentage
@@ -137,12 +137,15 @@ export default function PipelineAccuracyPanel() {
 
   if (!rows.length) {
     return (
+      <div className="space-y-6">
+      <LearningPanel />
       <div className="rounded-xl border border-dash-border bg-dash-bg p-6 text-sm text-dash-text-muted">
         <p className="text-dash-text">Nothing reviewed yet.</p>
         <p className="mt-2">
           Approve or reject a draft court in Pending Courts and it shows up here. Tick or cross
           the fields as you go, since only fields you actually judge count toward accuracy.
         </p>
+      </div>
       </div>
     );
   }
@@ -152,6 +155,8 @@ export default function PipelineAccuracyPanel() {
 
   return (
     <div className="space-y-6">
+      <LearningPanel />
+
       {/* headline: how much of this is actually verified */}
       <div className="rounded-xl border border-dash-border bg-dash-bg p-5">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
@@ -397,3 +402,201 @@ function Table({ title, data, empty }: { title: string; data: Record<string, { r
   );
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * LearningPanel — is the pipeline actually changing itself, and did it work?
+ *
+ * The improve pass runs on Avi's Mac and keeps its state in local files, so without this
+ * the dashboard could report accuracy while having no idea an experiment was running. Since
+ * the loop deliberately does NOT ask for approval, visibility after the fact is the whole
+ * accountability story: a log, not a gate.
+ *
+ * Reads one document, `pipeline_learning/state`, republished by each pass. It renders even
+ * when nothing has been learned, because "ran, found nothing worth changing" is the answer
+ * most weeks and is indistinguishable from a broken pass if the panel stays blank.
+ */
+type Experiment = {
+  id: string; field: string; kind: string; status: string; ref?: string; summary?: string;
+  appliedBatch?: number; measureAtBatch?: number;
+  accuracyBefore?: number; accuracyAfter?: number; fillBefore?: number; fillAfter?: number; delta?: number;
+};
+type LearningState = {
+  lastImproveRun?: string; lastAction?: string;
+  lastHarvestRun?: string; lastHarvestAction?: string; examplesHarvested?: number;
+  experiments?: Experiment[];
+  changelog?: { at?: string; batch?: number; area?: string; field?: string; summary?: string; by?: string }[];
+  validators?: { id: string; field: string; action: string; status: string; selfTest?: boolean; cases?: number }[];
+  rules?: Record<string, { id: string; field?: string; text: string; status?: string; expiresBatch?: number | null }[]>;
+  slotsUsed?: Record<string, number>;
+  maxSlots?: number;
+  weights?: Record<string, Record<string, { w: number; n: number; acc?: number | null }>>;
+};
+
+const EXP_STYLE: Record<string, string> = {
+  running: "bg-teal/15 text-teal",
+  proven: "bg-status-confirmed/15 text-status-confirmed",
+  "proven-by-abstention": "bg-status-confirmed/10 text-status-confirmed/80",
+  unproven: "bg-dash-bg text-dash-text-muted",
+  reverted: "bg-coral/15 text-coral",
+};
+const ago = (iso?: string) => {
+  if (!iso) return "never";
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 2) return "just now";
+  if (mins < 90) return `${mins} min ago`;
+  const h = Math.round(mins / 60);
+  return h < 36 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
+};
+
+export function LearningPanel() {
+  const [s, setS] = useState<LearningState | null | false>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, "pipeline_learning", "state"))
+      .then((d) => setS(d.exists() ? (d.data() as LearningState) : false))
+      .catch(() => setS(false));
+  }, []);
+
+  if (s === null) return null;
+  if (s === false) {
+    return (
+      <div className="rounded-xl border border-dash-border bg-dash-bg p-5 text-xs text-dash-text-muted">
+        <div className="font-display text-[11px] font-bold uppercase tracking-wider text-dash-text">Learning</div>
+        <p className="mt-2">
+          The improve pass has not reported in yet. It runs on your Mac at the start of every
+          batch, so this fills in after the next one.
+        </p>
+      </div>
+    );
+  }
+
+  const exps = s.experiments ?? [];
+  const running = exps.filter((e) => e.status === "running");
+  const settled = exps.filter((e) => e.status !== "running").slice().reverse();
+  const validators = (s.validators ?? []).filter((v) => v.status !== "reverted");
+  const ruleList = Object.entries(s.rules ?? {}).flatMap(([area, rs]) =>
+    (rs ?? []).filter((r) => r.status !== "reverted").map((r) => ({ ...r, area })));
+  const weightFields = Object.entries(s.weights ?? {});
+
+  return (
+    <div className="rounded-xl border border-dash-border bg-dash-bg p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="font-display text-[11px] font-bold uppercase tracking-wider text-dash-text">Learning</div>
+        <div className="text-[10px] text-dash-text-muted">last ran {ago(s.lastImproveRun)}</div>
+      </div>
+
+      <p className="mt-2 text-xs text-dash-text">{s.lastAction ?? "no report yet"}</p>
+
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-dash-text-muted">
+        <span>{validators.length} validator{validators.length === 1 ? "" : "s"}</span>
+        <span>
+          {ruleList.length} prompt rule{ruleList.length === 1 ? "" : "s"}
+          {s.maxSlots ? ` of ${s.maxSlots * Object.keys(s.slotsUsed ?? {}).length} slots` : ""}
+        </span>
+        <span>{weightFields.length} weighted field{weightFields.length === 1 ? "" : "s"}</span>
+        <span>{s.examplesHarvested ?? 0} vision example{s.examplesHarvested === 1 ? "" : "s"}</span>
+      </div>
+
+      {running.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[10px] uppercase tracking-wider text-dash-text-muted">In flight</div>
+          {running.map((e) => (
+            <div key={e.id} className="mt-1.5 rounded-lg bg-dash-surface p-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${EXP_STYLE.running}`}>running</span>
+                <span className="text-dash-text">{e.kind} on {FIELD_LABEL[e.field] ?? e.field}</span>
+                <span className="text-dash-text-muted">
+                  was {Math.round((e.accuracyBefore ?? 0) * 100)}% · judged again at batch {e.measureAtBatch}
+                </span>
+              </div>
+              {e.summary && <p className="mt-1 text-[11px] leading-relaxed text-dash-text-muted">{e.summary}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {settled.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[10px] uppercase tracking-wider text-dash-text-muted">Settled</div>
+          {settled.slice(0, 6).map((e) => (
+            <div key={e.id} className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${EXP_STYLE[e.status] ?? EXP_STYLE.unproven}`}>
+                {e.status}
+              </span>
+              <span className="text-dash-text">{e.kind} on {FIELD_LABEL[e.field] ?? e.field}</span>
+              <span className="text-dash-text-muted">
+                {Math.round((e.accuracyBefore ?? 0) * 100)}% → {Math.round((e.accuracyAfter ?? 0) * 100)}%
+                {e.status === "proven-by-abstention"
+                  ? `, but fill fell ${Math.round(((e.fillBefore ?? 0) - (e.fillAfter ?? 0)) * 100)} points`
+                  : ""}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(validators.length > 0 || ruleList.length > 0) && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {validators.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-dash-text-muted">Validators (enforced in code)</div>
+              {validators.map((v) => (
+                <div key={v.id} className="mt-1 text-[11px] text-dash-text">
+                  {v.selfTest === false && <span className="mr-1 text-coral" title="failed its own test cases, disabled">⚠</span>}
+                  {v.id}
+                  <span className="text-dash-text-muted"> · {FIELD_LABEL[v.field] ?? v.field}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {ruleList.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-dash-text-muted">Prompt rules (last resort)</div>
+              {ruleList.map((r) => (
+                <div key={r.id} className="mt-1 text-[11px] text-dash-text">
+                  {r.text}
+                  <span className="text-dash-text-muted">
+                    {" "}· {r.area.replace("_", " ")}{r.expiresBatch ? `, expires batch ${r.expiresBatch}` : ", permanent"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {weightFields.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[10px] uppercase tracking-wider text-dash-text-muted">Bot weights in effect</div>
+          {weightFields.map(([field, models]) => (
+            <div key={field} className="mt-1 text-[11px]">
+              <span className="text-dash-text">{field}</span>
+              <span className="text-dash-text-muted">
+                {" "}— {Object.entries(models).map(([m, c]) => `${m} ×${c.w}`).join(", ")}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(s.changelog ?? []).length > 0 && (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-[10px] uppercase tracking-wider text-dash-text-muted hover:text-dash-text">
+            Change history ({s.changelog!.length})
+          </summary>
+          <div className="mt-2 space-y-1">
+            {s.changelog!.map((c, i) => (
+              <div key={i} className="text-[11px] text-dash-text-muted">
+                <span className="text-dash-text-muted/60">{c.at} · batch {c.batch} · {c.by}</span>
+                <br />
+                <span className="text-dash-text">{c.summary}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
