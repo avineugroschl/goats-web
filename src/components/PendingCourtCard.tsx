@@ -7,11 +7,21 @@
  * badge (🟢🟡🔴) and an expandable "AI research" panel (per-bot local intel, vision
  * notes, layout votes, satellite link). Lets the admin edit fields, upload a photo,
  * Save (to pending_courts), and Approve (parent copies to the live `courts` collection).
+ *
+ * Each pipeline-supplied field also carries a ✓/✗ verdict and a note. Editing a value was
+ * never enough of a signal on its own: an untouched field could mean "checked, correct" or
+ * "never looked at", and treating those the same counts every unexamined field as a win
+ * for the bots. The verdict says which, and untouched stays a real third state.
+ *
+ * Verdicts autosave to the pending doc as you tap, so a queue can be worked through over
+ * several sittings; `logPipelineCorrections` freezes them into the correction at approval.
  */
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
+import type { ReviewFeedback, Verdict } from "@/lib/corrections";
+
 
 type Review = {
   mapsLink?: string;
@@ -29,7 +39,11 @@ type Review = {
   fieldConfidence?: Record<string, string | null>;
   // per-bot verdict on whether the stored address/coordinates match the court they researched
   location?: { disputed?: number; checked?: number; confidence?: string; by_model?: Record<string, string> };
+  // immutable snapshot of what the pipeline proposed; 'backfill' = reconstructed after the fact
+  predicted?: Record<string, unknown>;
+  predictedSource?: string;
 };
+
 
 export type ReviewCourt = {
   id: string;
@@ -52,7 +66,29 @@ export type ReviewCourt = {
   photoUrlFull?: string;
   status: string;
   pipelineReview?: Review;
+  reviewFeedback?: ReviewFeedback;
 };
+
+/** Every pipeline-supplied field gets judged. Mirrors JUDGED in lib/corrections.ts. */
+const JUDGE_LABEL: Record<string, string> = {
+  name: "Name", address: "Address", latitude: "Latitude", longitude: "Longitude",
+  baskets: "Baskets", setting: "Setting", accessType: "Access", hasLights: "Lights",
+  courtCondition: "Condition", threePointLine: "3PT line", hoursOfOperation: "Hours",
+  phoneNumber: "Phone", goatsTake: "GOATS Take",
+};
+const JUDGE_KEYS = Object.keys(JUDGE_LABEL);
+
+/** What the ✓/✗ pair needs to render and report one field. */
+type Judge = {
+  f: string;
+  verdict: Verdict;
+  note: string;
+  /** value differs from what the pipeline proposed — with ✓ this is the "close" case */
+  changed: boolean;
+  set: (f: string, v: Verdict) => void;
+  setNote: (f: string, note: string) => void;
+};
+
 
 const BADGE: Record<string, string> = { GREEN: "🟢", YELLOW: "🟡", RED: "🔴" };
 function Conf({ c }: { c?: string }) {
@@ -60,15 +96,82 @@ function Conf({ c }: { c?: string }) {
   return <span title={`${c} confidence`} className="ml-1 text-xs">{BADGE[c] ?? ""}</span>;
 }
 
-function Field({ label, children, conf }: { label: string; children: React.ReactNode; conf?: string }) {
+/**
+ * The ✓/✗ pair that sits on a field's label row.
+ *
+ * Untouched is the zero-effort default and must stay that way — nine fields times three
+ * controls is enough clicking that any friction here means the feature stops being used by
+ * the third card, and unused capture is worse than none. So: hollow until tapped, one tap
+ * to judge, tap the same mark again to clear back to untouched.
+ *
+ * "close" appears when a field is ticked AND its value was edited: right enough to pass,
+ * still needed a nudge. That is a different problem from being wrong (tighten a prompt vs
+ * distrust a source), so it is worth seeing on the card and counting separately.
+ */
+function VerdictMark({ j }: { j: Judge }) {
+  const base = "rounded px-1.5 py-0.5 text-[11px] leading-none transition-colors";
+  const on = (v: Verdict) => j.verdict === v;
   return (
-    <label className="flex flex-col gap-1 text-xs">
-      <span className="text-dash-text-muted">{label}<Conf c={conf} /></span>
-      {children}
-    </label>
+    <span className="ml-auto flex items-center gap-1">
+      {on("confirmed") && j.changed && (
+        <span className="rounded bg-status-confirmed/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-status-confirmed">
+          close
+        </span>
+      )}
+      <button
+        type="button"
+        title={on("confirmed") ? "clear" : "correct"}
+        onClick={() => j.set(j.f, on("confirmed") ? "untouched" : "confirmed")}
+        className={`${base} ${on("confirmed")
+          ? "bg-status-confirmed/20 text-status-confirmed"
+          : "text-dash-text-muted/50 hover:text-status-confirmed"}`}
+      >✓</button>
+      <button
+        type="button"
+        title={on("wrong") ? "clear" : "wrong"}
+        onClick={() => j.set(j.f, on("wrong") ? "untouched" : "wrong")}
+        className={`${base} ${on("wrong")
+          ? "bg-coral/20 text-coral"
+          : "text-dash-text-muted/50 hover:text-coral"}`}
+      >✗</button>
+    </span>
   );
 }
-const inputCls = "rounded-lg border border-dash-border bg-dash-bg px-3 py-2 text-sm text-dash-text";
+
+/** Note line under a judged field. Hidden until there is a verdict, so the card stays readable. */
+function FieldNote({ j }: { j: Judge }) {
+  if (j.verdict === "untouched") return null;
+  const prompt = j.verdict === "wrong"
+    ? "wrong. what's right?"
+    : j.changed ? "what did you fix?" : "add a note";
+  return (
+    <div className="mt-1 pl-3">
+      <span className="text-[10px] text-dash-text-muted/70">↳ {prompt}</span>
+      <input
+        className="mt-0.5 w-full rounded-lg border border-dash-border bg-dash-bg px-2 py-1 text-xs text-dash-text"
+        value={j.note}
+        onChange={(e) => j.setNote(j.f, e.target.value)}
+      />
+    </div>
+  );
+}
+
+function Field({ label, children, conf, judge }: {
+  label: string; children: React.ReactNode; conf?: string; judge?: Judge;
+}) {
+  return (
+    <div className="flex flex-col gap-1 text-xs">
+      <span className="flex items-center text-dash-text-muted">
+        {label}<Conf c={conf} />
+        {judge && <VerdictMark j={judge} />}
+      </span>
+      {children}
+      {judge && <FieldNote j={judge} />}
+    </div>
+  );
+}
+const inputCls = "w-full rounded-lg border border-dash-border bg-dash-bg px-3 py-2 text-sm text-dash-text";
+
 
 export default function PendingCourtCard({
   court, busy, onApprove, onReject, onHide,
@@ -76,7 +179,8 @@ export default function PendingCourtCard({
   court: ReviewCourt;
   busy: boolean;
   onApprove: (draft: ReviewCourt) => void;
-  onReject: (id: string) => void;
+  onReject: (id: string, feedback?: ReviewFeedback) => void;
+
   onHide: (id: string) => void;
 }) {
   const [d, setD] = useState<ReviewCourt>(court);
@@ -88,6 +192,103 @@ export default function PendingCourtCard({
 
   const photo = d.photoUrlCard || d.photoUrl || "";
   const intelEntries = useMemo(() => Object.entries(rv?.localIntel ?? {}), [rv]);
+
+  // ── per-field verdicts ────────────────────────────────────────────────────
+  const [fb, setFb] = useState<ReviewFeedback>(court.reviewFeedback ?? {});
+  // Autosave must not fire on mount, or simply opening the queue would stamp every card.
+  const fbDirty = useRef(false);
+
+  /**
+   * Did this field's value move away from what the pipeline proposed?
+   *
+   * Prefers the frozen `predicted` snapshot. Falls back to the values the card mounted
+   * with for the two free-prose fields it deliberately doesn't carry, which reads as
+   * "you edited this in this sitting" — weaker, but honest and never wrong in the
+   * direction that invents a correction.
+   */
+  const changedFrom = useCallback((f: string): boolean => {
+    const p = rv?.predicted;
+    const before = p && p[f] !== undefined ? p[f] : (court as unknown as Record<string, unknown>)[f];
+    const now = (d as unknown as Record<string, unknown>)[f];
+    if (f === "latitude" || f === "longitude") {
+      const a = Number(before), b = Number(now);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return a !== b;
+      return Math.abs(a - b) >= 0.0001;      // ~11m, so re-typing 40.712776 isn't a correction
+    }
+    if (typeof before === "string" || typeof now === "string") {
+      return String(before ?? "").trim().toLowerCase() !== String(now ?? "").trim().toLowerCase();
+    }
+    return (before ?? null) !== (now ?? null);
+  }, [rv, court, d]);
+
+  const setVerdict = useCallback((f: string, v: Verdict, via: "individual" | "bulk" = "individual") => {
+    fbDirty.current = true;
+    setFb((p) => {
+      const fields = { ...(p.fields ?? {}) };
+      // Clearing back to untouched drops the entry entirely rather than storing
+      // {verdict:"untouched"} — absent and untouched are the same thing, and one
+      // representation of it means the dashboard can't disagree with itself.
+      if (v === "untouched") {
+        const note = fields[f]?.note;
+        if (note) fields[f] = { note };            // keep a note the verdict didn't own
+        else delete fields[f];
+      } else {
+        fields[f] = { ...(fields[f] ?? {}), verdict: v, via };
+      }
+      return { ...p, fields };
+    });
+  }, []);
+
+  const setFieldNote = useCallback((f: string, note: string) => {
+    fbDirty.current = true;
+    setFb((p) => ({ ...p, fields: { ...(p.fields ?? {}), [f]: { ...(p.fields ?? {})[f], note } } }));
+  }, []);
+
+  /** Fill in only what hasn't been judged, and mark it bulk so it stays distinguishable. */
+  const markAllCorrect = useCallback(() => {
+    fbDirty.current = true;
+    setFb((p) => {
+      const fields = { ...(p.fields ?? {}) };
+      for (const f of JUDGE_KEYS) {
+        if (!fields[f]?.verdict) fields[f] = { ...(fields[f] ?? {}), verdict: "confirmed", via: "bulk" };
+      }
+      return { ...p, fields };
+    });
+  }, []);
+
+  // Verdicts belong to the review, not to the court's values, so they save on their own
+  // rather than waiting behind the explicit "Save edits" button. Debounced so holding a key
+  // in a note box isn't one write per character.
+  const [fbSaved, setFbSaved] = useState(true);
+  useEffect(() => {
+    if (!fbDirty.current) return;
+    setFbSaved(false);
+    const t = setTimeout(() => {
+      updateDoc(doc(db, "pending_courts", court.id), { reviewFeedback: fb })
+        .then(() => setFbSaved(true))
+        .catch((e) => console.warn("verdict save failed:", e));
+    }, 700);
+    return () => clearTimeout(t);
+  }, [fb, court.id]);
+
+  // Only a pipeline draft still awaiting a decision can be judged. A hand-submitted court
+  // has no prediction to be right or wrong about, and an already-approved one had its
+  // correction written at approval — offering ✓/✗ on either would collect taps that go
+  // nowhere, which is worse than not offering them.
+  const canJudge = !!rv && court.status === "pending";
+
+  const judge = useCallback((f: string): Judge | undefined => canJudge ? ({
+    f,
+    verdict: fb.fields?.[f]?.verdict ?? "untouched",
+    note: fb.fields?.[f]?.note ?? "",
+    changed: changedFrom(f),
+    set: setVerdict,
+    setNote: setFieldNote,
+  }) : undefined, [canJudge, fb, changedFrom, setVerdict, setFieldNote]);
+
+
+  const judgedCount = JUDGE_KEYS.filter((f) => fb.fields?.[f]?.verdict).length;
+
 
   async function save() {
     setSaving(true);
@@ -157,42 +358,77 @@ export default function PendingCourtCard({
         </div>
       )}
 
+      {/* Verdict progress + the bulk shortcut. Without a shortcut the honest-but-tedious
+          path (thirteen taps on a card where nothing is wrong) gets abandoned, and an
+          abandoned check is worse data than a bulk one that is recorded AS bulk. */}
+      {canJudge && (
+        <div className="mb-3 flex items-center gap-3 text-[11px]">
+
+          <span className="text-dash-text-muted">
+            checked {judgedCount} of {JUDGE_KEYS.length} fields
+          </span>
+          <button type="button" onClick={markAllCorrect}
+            className="rounded border border-status-confirmed/40 px-2 py-0.5 text-status-confirmed hover:bg-status-confirmed/10">
+            All correct
+          </button>
+          {!fbSaved && <span className="text-dash-text-muted/60">saving…</span>}
+        </div>
+      )}
+
       {/* editable fields */}
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
-        <Field label="Name"><input className={inputCls} value={d.name} onChange={(e) => set("name", e.target.value)} /></Field>
-        <Field label="Address" conf={rv?.fieldConfidence?.location ?? undefined}><input className={inputCls} value={d.address} onChange={(e) => set("address", e.target.value)} /></Field>
-        <Field label="Latitude"><input type="number" step="any" className={inputCls} placeholder="e.g. 40.712776" value={d.latitude ?? ""} onChange={(e) => set("latitude", e.target.value === "" ? undefined : Number(e.target.value))} /></Field>
-        <Field label="Longitude"><input type="number" step="any" className={inputCls} placeholder="e.g. -74.005974" value={d.longitude ?? ""} onChange={(e) => set("longitude", e.target.value === "" ? undefined : Number(e.target.value))} /></Field>
-        <Field label="Baskets (hoops)" conf={rv?.hoops?.confidence}>
+        <Field label="Name" judge={judge("name")}><input className={inputCls} value={d.name} onChange={(e) => set("name", e.target.value)} /></Field>
+        <Field label="Address" conf={rv?.fieldConfidence?.location ?? undefined} judge={judge("address")}><input className={inputCls} value={d.address} onChange={(e) => set("address", e.target.value)} /></Field>
+        <Field label="Latitude" judge={judge("latitude")}><input type="number" step="any" className={inputCls} placeholder="e.g. 40.712776" value={d.latitude ?? ""} onChange={(e) => set("latitude", e.target.value === "" ? undefined : Number(e.target.value))} /></Field>
+        <Field label="Longitude" judge={judge("longitude")}><input type="number" step="any" className={inputCls} placeholder="e.g. -74.005974" value={d.longitude ?? ""} onChange={(e) => set("longitude", e.target.value === "" ? undefined : Number(e.target.value))} /></Field>
+        <Field label="Baskets (hoops)" conf={rv?.hoops?.confidence} judge={judge("baskets")}>
           <input type="number" className={inputCls} value={d.baskets} onChange={(e) => set("baskets", Number(e.target.value))} />
         </Field>
-        <Field label="Setting">
+        <Field label="Setting" judge={judge("setting")}>
           <select className={inputCls} value={d.setting} onChange={(e) => set("setting", e.target.value)}>
             <option>Outdoor</option><option>Indoor</option>
           </select>
         </Field>
-        <Field label="Access">
+        <Field label="Access" judge={judge("accessType")}>
           <select className={inputCls} value={d.accessType} onChange={(e) => set("accessType", e.target.value)}>
             {/* "Membership" is canonical (filter matches by prefix); the old
                 "Membership Required" stays so existing drafts render right. */}
             <option>Public</option><option>Private</option><option>Membership</option><option>Membership Required</option>
           </select>
         </Field>
-        <Field label="Lights" conf={rv?.lights?.confidence}>
+        <Field label="Lights" conf={rv?.lights?.confidence} judge={judge("hasLights")}>
           <label className="flex items-center gap-2 py-2 text-sm text-dash-text">
             <input type="checkbox" checked={!!d.hasLights} onChange={(e) => set("hasLights", e.target.checked)} /> has lights
           </label>
         </Field>
-        <Field label="Condition" conf={rv?.fieldConfidence?.surface ?? undefined}><input className={inputCls} value={d.courtCondition} onChange={(e) => set("courtCondition", e.target.value)} /></Field>
-        <Field label="3PT line" conf={rv?.fieldConfidence?.threePoint ?? undefined}><input className={inputCls} value={d.threePointLine} onChange={(e) => set("threePointLine", e.target.value)} /></Field>
-        <Field label="Hours" conf={rv?.fieldConfidence?.hours ?? undefined}><input className={inputCls} placeholder="blank if unverified" value={d.hoursOfOperation} onChange={(e) => set("hoursOfOperation", e.target.value)} /></Field>
-        <Field label="Phone" conf={rv?.fieldConfidence?.phone ?? undefined}><input className={inputCls} placeholder="blank if unverified" value={d.phoneNumber} onChange={(e) => set("phoneNumber", e.target.value)} /></Field>
+        <Field label="Condition" conf={rv?.fieldConfidence?.surface ?? undefined} judge={judge("courtCondition")}><input className={inputCls} value={d.courtCondition} onChange={(e) => set("courtCondition", e.target.value)} /></Field>
+        <Field label="3PT line" conf={rv?.fieldConfidence?.threePoint ?? undefined} judge={judge("threePointLine")}><input className={inputCls} value={d.threePointLine} onChange={(e) => set("threePointLine", e.target.value)} /></Field>
+        <Field label="Hours" conf={rv?.fieldConfidence?.hours ?? undefined} judge={judge("hoursOfOperation")}><input className={inputCls} placeholder="blank if unverified" value={d.hoursOfOperation} onChange={(e) => set("hoursOfOperation", e.target.value)} /></Field>
+        <Field label="Phone" conf={rv?.fieldConfidence?.phone ?? undefined} judge={judge("phoneNumber")}><input className={inputCls} placeholder="blank if unverified" value={d.phoneNumber} onChange={(e) => set("phoneNumber", e.target.value)} /></Field>
+        {/* no verdict: the pipeline never fills this in, so there is nothing of its to judge */}
         <Field label="Booking link"><input className={inputCls} placeholder="blank = no Book button" value={d.bookingUrl ?? ""} onChange={(e) => set("bookingUrl", e.target.value)} /></Field>
       </div>
 
       <div className="mb-4">
-        <Field label="GOATS Take"><textarea className={`${inputCls} min-h-[80px]`} value={d.goatsTake} onChange={(e) => set("goatsTake", e.target.value)} /></Field>
+        <Field label="GOATS Take" judge={judge("goatsTake")}><textarea className={`${inputCls} min-h-[80px]`} value={d.goatsTake} onChange={(e) => set("goatsTake", e.target.value)} /></Field>
       </div>
+
+      {/* Card-level note: anything about the court or the draft as a whole that doesn't
+          belong to one field. */}
+      {canJudge && (
+        <div className="mb-4">
+          <Field label="Note on this card">
+
+            <textarea
+              className={`${inputCls} min-h-[52px]`}
+              placeholder="anything about this court or draft that isn't about one field"
+              value={fb.cardNote ?? ""}
+              onChange={(e) => { fbDirty.current = true; setFb((p) => ({ ...p, cardNote: e.target.value })); }}
+            />
+          </Field>
+        </div>
+      )}
+
 
       <div className="mb-4 flex items-center gap-3">
         <label className="cursor-pointer rounded-lg border border-dash-border px-3 py-1.5 text-xs text-dash-text hover:bg-dash-bg">
@@ -247,7 +483,8 @@ export default function PendingCourtCard({
       <div className="flex flex-wrap gap-3">
         {court.status === "pending" && (
           <>
-            <button onClick={() => onApprove(d)} disabled={busy || saving}
+            <button onClick={() => onApprove({ ...d, reviewFeedback: fb })} disabled={busy || saving}
+
               className="rounded-xl bg-status-confirmed px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-white hover:bg-status-confirmed/80 disabled:opacity-50">
               {busy ? "..." : "Approve"}
             </button>
@@ -255,7 +492,8 @@ export default function PendingCourtCard({
               className="rounded-xl border border-teal px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-teal hover:bg-teal/10 disabled:opacity-40">
               {saving ? "Saving…" : dirty ? "Save edits" : "Saved"}
             </button>
-            <button onClick={() => onReject(court.id)} disabled={busy}
+            <button onClick={() => onReject(court.id, fb)} disabled={busy}
+
               className="rounded-xl bg-status-rejected/10 px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-status-rejected hover:bg-status-rejected/20 disabled:opacity-50">
               Reject
             </button>

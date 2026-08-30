@@ -27,10 +27,14 @@ import { useAuth } from "@/lib/auth-context";
 import { OperatorApplication, NewCourtData } from "@/lib/types";
 import PipelineControls from "@/components/PipelineControls";
 import PendingCourtCard, { ReviewCourt } from "@/components/PendingCourtCard";
-import { logPipelineCorrections } from "@/lib/corrections";
+import { logPipelineCorrections, type ReviewFeedback } from "@/lib/corrections";
+import PipelineAccuracyPanel from "@/components/PipelineAccuracyPanel";
+
+
 
 type AdminTab = "applications" | "courts" | "liveCourts" | "dashboard" | "ambassadors";
-type DashTab = "comments" | "feedback" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators";
+type DashTab = "comments" | "feedback" | "users" | "profilePics" | "checkIns" | "ratings" | "deletedOperators" | "pipeline";
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN ADMIN PAGE
@@ -506,7 +510,7 @@ function PendingCourtsTab() {
     }
   }
 
-  async function handleReject(courtId: string) {
+  async function handleReject(courtId: string, feedback?: ReviewFeedback) {
     setActionLoading(courtId);
     try {
       await updateDoc(doc(db, "pending_courts", courtId), {
@@ -516,12 +520,16 @@ function PendingCourtsTab() {
 
       // A rejection is the strongest signal there is: the pipeline proposed a court that
       // shouldn't exist. Log it against the same per-bot claims as an approval.
+      // The card hands its verdicts over directly: they autosave on a debounce, so the
+      // snapshot copy in `courts` can still be a beat behind when Reject is clicked.
       const rejected = courts.find((c) => c.id === courtId);
       if (rejected) {
         logPipelineCorrections(
-          rejected as unknown as Record<string, unknown>, null, "rejected", user?.uid ?? null,
+          { ...(rejected as unknown as Record<string, unknown>), ...(feedback ? { reviewFeedback: feedback } : {}) },
+          null, "rejected", user?.uid ?? null,
         ).catch((e) => console.warn("corrections log failed (non-fatal):", e));
       }
+
       setCourts((prev) => prev.map((c) => c.id === courtId ? { ...c, status: "rejected" } : c));
     } finally {
       setActionLoading(null);
@@ -743,7 +751,9 @@ function DashboardTab() {
           { id: "checkIns" as const, label: "Check-Ins" },
           { id: "ratings" as const, label: "Ratings" },
           { id: "deletedOperators" as const, label: "Deleted Operators" },
+          { id: "pipeline" as const, label: "Pipeline Accuracy" },
         ]).map((tab) => (
+
           <button key={tab.id} onClick={() => setDashTab(tab.id)}
             className={`rounded-lg px-4 py-2 font-display text-xs font-bold transition-all ${
               dashTab === tab.id ? "bg-teal text-surface-dark" : "text-dash-text-muted hover:text-dash-text"
@@ -760,6 +770,8 @@ function DashboardTab() {
       {dashTab === "checkIns" && <CheckInsPanel />}
       {dashTab === "ratings" && <RatingsPanel />}
       {dashTab === "deletedOperators" && <DeletedOperatorsPanel />}
+      {dashTab === "pipeline" && <PipelineAccuracyPanel />}
+
     </div>
   );
 }
