@@ -113,7 +113,7 @@ export default function OperatorLanding() {
 
           <p className="mb-10 max-w-lg text-lg leading-relaxed text-white/60">
             Have your court listed on G.O.A.T.S, track activity, run promotions,
-            and keep players in the loop — all from one dashboard.
+            and keep players in the loop. All from one dashboard.
           </p>
 
           <div className="grid max-w-md grid-cols-2 gap-4">
