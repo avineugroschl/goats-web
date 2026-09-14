@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   doc,
   getDoc,
@@ -24,6 +24,8 @@ interface SentNotification {
   sentAt: Timestamp | null;
   sentBy: string;
   recipientCount?: number;
+  // Set by onCourtNotificationCreated when it refuses to deliver.
+  error?: string;
 }
 
 const MAX_PER_DAY = 2;
@@ -35,7 +37,6 @@ export default function NotificationsPage() {
   const [court, setCourt] = useState<Court | null>(null);
   const [loading, setLoading] = useState(true);
   const [followerCount, setFollowerCount] = useState(0);
-  const [sentToday, setSentToday] = useState(0);
   const [history, setHistory] = useState<SentNotification[]>([]);
   const [message, setMessage] = useState("");
   const [alsoSetBanner, setAlsoSetBanner] = useState(true);
@@ -83,15 +84,6 @@ export default function NotificationsPage() {
           ...d.data(),
         })) as SentNotification[];
         setHistory(notifs);
-
-        // Count how many were sent today
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayCount = notifs.filter((n) => {
-          if (!n.sentAt) return false;
-          return n.sentAt.toDate() >= todayStart;
-        }).length;
-        setSentToday(todayCount);
       }
     );
     return unsub;
@@ -125,6 +117,16 @@ export default function NotificationsPage() {
       setSending(false);
     }
   }
+
+  const sentToday = useMemo(() => {
+    const zone = court?.timeZone || "America/New_York";
+    const localDay = (d: Date) =>
+      d.toLocaleDateString("en-CA", { timeZone: zone });
+    const today = localDay(new Date());
+    return history.filter(
+      (n) => n.sentAt && localDay(n.sentAt.toDate()) === today
+    ).length;
+  }, [history, court?.timeZone]);
 
   const canSend = sentToday < MAX_PER_DAY && message.trim().length > 0;
   const remaining = MAX_PER_DAY - sentToday;
@@ -237,11 +239,17 @@ export default function NotificationsPage() {
               <div key={n.id} className="rounded-xl border border-dash-border bg-dash-bg px-4 py-3">
                 <div className="flex items-start justify-between gap-4">
                   <p className="text-sm text-white/80">{n.message}</p>
-                  {n.recipientCount !== undefined && (
+                  {/* A rejected send also carries recipientCount: 0, which read
+                      as "nobody follows you" instead of "this never went out". */}
+                  {n.error ? (
+                    <span className="shrink-0 rounded-full bg-coral/10 px-2 py-0.5 text-[10px] font-bold text-coral">
+                      Not delivered
+                    </span>
+                  ) : n.recipientCount !== undefined ? (
                     <span className="shrink-0 rounded-full bg-teal/10 px-2 py-0.5 text-[10px] font-bold text-teal">
                       Sent to {n.recipientCount} follower{n.recipientCount !== 1 ? "s" : ""}
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 <p className="mt-1 text-xs text-white/30">
                   {n.sentAt
@@ -253,6 +261,13 @@ export default function NotificationsPage() {
                       })
                     : "Sending..."}
                 </p>
+                {n.error && (
+                  <p className="mt-1 text-xs text-coral/70">
+                    {n.error === "Daily limit exceeded"
+                      ? `Over the ${MAX_PER_DAY} per day limit, so this one was not sent.`
+                      : n.error}
+                  </p>
+                )}
               </div>
             ))}
           </div>
