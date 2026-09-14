@@ -24,6 +24,7 @@ import {
 import { ref, deleteObject } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { TRIAL_DAYS, trialEndingInDays } from "@/lib/operator-access";
 import { OperatorApplication, NewCourtData } from "@/lib/types";
 import PipelineControls from "@/components/PipelineControls";
 import PendingCourtCard, { ReviewCourt } from "@/components/PendingCourtCard";
@@ -177,6 +178,9 @@ function ApplicationsTab() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [freeAccess, setFreeAccess] = useState<Record<string, boolean>>({});
+  // Trial is the default for a new approval, so an unset entry means "on".
+  // Read this through grantTrial[id] ?? true, never as a bare boolean.
+  const [grantTrial, setGrantTrial] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
 
   useEffect(() => { loadApplications(); }, []);
@@ -263,8 +267,13 @@ function ApplicationsTab() {
         operatorUpdate.operatorCourtIds = arrayUnion(courtId);
       }
       if (freeAccess[app.id]) {
+        // A permanent comp supersedes a trial — no expiry to track.
         operatorUpdate.subscriptionStatus = "active";
         operatorUpdate.freeAccess = true;
+      } else if (grantTrial[app.id] ?? true) {
+        // No Stripe customer and no card: subscriptionStatus stays "none" and
+        // the dashboard gate reads this date directly.
+        operatorUpdate.trialEndsAt = trialEndingInDays();
       }
       await setDoc(doc(db, "operators", app.applicantId), operatorUpdate, { merge: true });
 
@@ -364,6 +373,17 @@ function ApplicationsTab() {
                     <Checkbox checked={freeAccess[app.id]} />
                     Grant free access (skip payment)
                   </button>
+                  {!freeAccess[app.id] && (
+                    <button
+                      onClick={() =>
+                        setGrantTrial((prev) => ({ ...prev, [app.id]: !(prev[app.id] ?? true) }))
+                      }
+                      className="flex items-center gap-3 text-sm text-white/60"
+                    >
+                      <Checkbox checked={grantTrial[app.id] ?? true} />
+                      Start with a free {TRIAL_DAYS}-day trial (no card)
+                    </button>
+                  )}
                   <div className="flex gap-3">
                     <button onClick={() => handleApprove(app)} disabled={actionLoading === app.id}
                       className="rounded-xl bg-status-confirmed px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-status-confirmed/80 disabled:opacity-50">

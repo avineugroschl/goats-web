@@ -60,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             subscriptionExpiresAt: data.subscriptionExpiresAt ?? undefined,
             applicationStatus: data.applicationStatus,
             freeAccess: data.freeAccess ?? false,
+            trialEndsAt: data.trialEndsAt ?? undefined,
           });
           return;
         }

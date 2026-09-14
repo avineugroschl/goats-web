@@ -10,6 +10,13 @@ import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { RESERVATIONS_ENABLED, PAYMENT_GATING_ENABLED } from "@/lib/features";
+import {
+  needsSubscription,
+  isTrialOnly,
+  trialDaysLeft,
+  courtSeatLimit,
+  formatAccessDate,
+} from "@/lib/operator-access";
 import { SelectedCourtProvider, useSelectedCourt } from "@/lib/selected-court";
 import { CourtSwitcher } from "@/components/CourtSwitcher";
 import { ActivateCourtModal } from "@/components/ActivateCourtModal";
@@ -112,14 +119,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const isPending = profile?.applicationStatus === "pending" && !profile?.operatorCourtIds?.length;
   const isRejected = profile?.applicationStatus === "rejected" && !profile?.operatorCourtIds?.length;
-  // Payment gate: approved operators must have an active subscription before
-  // they can use the dashboard. Behind a feature flag because Stripe isn't
-  // wired yet — flip PAYMENT_GATING_ENABLED to enable.
+  // Payment gate: approved operators must have an active subscription, a comp,
+  // or a live free trial before they can use the dashboard. Behind a feature
+  // flag so the whole paywall can be switched off in one place.
   const needsPayment =
     PAYMENT_GATING_ENABLED &&
     profile?.applicationStatus === "approved" &&
-    profile?.subscriptionStatus !== "active" &&
-    profile?.subscriptionStatus !== "cancelling";
+    needsSubscription(profile);
 
   return (
     <SelectedCourtProvider uid={user.uid} courtIds={profile.operatorCourtIds ?? []}>
@@ -135,7 +141,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         needsPayment={needsPayment}
         operatorCourtIds={profile.operatorCourtIds ?? []}
         subscriptionQuantity={profile.subscriptionQuantity ?? 1}
-        freeAccess={profile.freeAccess}
+        seatLimit={courtSeatLimit(profile)}
+        onTrial={isTrialOnly(profile)}
+        trialDays={trialDaysLeft(profile)}
+        trialEndsAt={profile.trialEndsAt}
         onSignOut={async () => { await signOut(auth); router.push("/operator"); }}
       >
         {children}
@@ -156,7 +165,10 @@ interface DashboardShellProps {
   needsPayment: boolean;
   operatorCourtIds: string[];
   subscriptionQuantity: number;
-  freeAccess?: boolean;
+  seatLimit: number;
+  onTrial: boolean;
+  trialDays: number;
+  trialEndsAt?: string;
   onSignOut: () => Promise<void>;
   children: React.ReactNode;
 }
@@ -173,7 +185,10 @@ function DashboardShell({
   needsPayment,
   operatorCourtIds,
   subscriptionQuantity,
-  freeAccess,
+  seatLimit,
+  onTrial,
+  trialDays,
+  trialEndsAt,
   onSignOut,
   children,
 }: DashboardShellProps) {
@@ -198,8 +213,7 @@ function DashboardShell({
           <CourtSwitcher
             uid={uid}
             operatorCourtIds={operatorCourtIds}
-            subscriptionQuantity={subscriptionQuantity}
-            freeAccess={freeAccess}
+            seatLimit={seatLimit}
             onActivateCourt={(c) => setActivateModalCourt(c)}
           />
         </div>
@@ -317,6 +331,7 @@ function DashboardShell({
             <PaymentRequiredState />
           ) : (
             <>
+              {onTrial && <TrialBanner daysLeft={trialDays} endsAt={trialEndsAt} />}
               {selectedCourtId && (
                 <UnpublishedBanner courtId={selectedCourtId} />
               )}
@@ -334,6 +349,62 @@ function DashboardShell({
           onActivated={() => setActivateModalCourt(null)}
         />
       )}
+    </div>
+  );
+}
+
+// Sends the operator to Stripe's hosted checkout. Both the paywall screen and
+// the trial banner start the same flow, so the callable lives in one place.
+async function redirectToCheckout(): Promise<void> {
+  const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
+  const result = await createCheckoutSession();
+  const url = (result.data as { url: string }).url;
+  if (!url) throw new Error("Checkout session returned no URL");
+  window.location.href = url;
+}
+
+// Shown on every dashboard page while a free trial is live. Trials carry no
+// card, so nothing converts on its own — this is the only thing telling the
+// operator a bill is coming.
+function TrialBanner({ daysLeft, endsAt }: { daysLeft: number; endsAt?: string }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const endDate = formatAccessDate(endsAt);
+
+  async function handleSubscribe() {
+    setLoading(true);
+    setError("");
+    try {
+      await redirectToCheckout();
+    } catch (err) {
+      console.error("Checkout error:", err);
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="mb-6 rounded-2xl border border-teal/30 bg-teal/5 px-5 py-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-display mb-1 text-xs font-bold uppercase tracking-widest text-teal">
+            Free Trial &middot; {daysLeft === 1 ? "1 day left" : `${daysLeft} days left`}
+          </p>
+          <p className="text-sm text-white/60">
+            {endDate
+              ? `You have full operator access until ${endDate}. Subscribe any time to keep it.`
+              : "You have full operator access. Subscribe any time to keep it."}
+          </p>
+        </div>
+        <button
+          onClick={handleSubscribe}
+          disabled={loading}
+          className="shrink-0 rounded-xl bg-teal px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-surface-dark transition-all hover:bg-teal-dark disabled:opacity-50"
+        >
+          {loading ? "Redirecting..." : "Subscribe"}
+        </button>
+      </div>
+      {error && <p className="mt-3 text-sm text-coral">{error}</p>}
     </div>
   );
 }
@@ -417,18 +488,10 @@ function PaymentRequiredState() {
     setLoading(true);
     setError("");
     try {
-      const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
-      const result = await createCheckoutSession();
-      const url = (result.data as { url: string }).url;
-      if (url) {
-        window.location.href = url;
-      } else {
-        setError("Failed to create checkout session. Try again.");
-      }
+      await redirectToCheckout();
     } catch (err) {
       console.error("Checkout error:", err);
       setError("Something went wrong. Please try again.");
-    } finally {
       setLoading(false);
     }
   }

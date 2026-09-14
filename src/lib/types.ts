@@ -168,6 +168,12 @@ export interface OperatorRecord {
   subscriptionQuantity?: number;
   applicationStatus?: "pending" | "approved" | "rejected";
   subscriptionExpiresAt?: string;
+  // Free-trial expiry (ISO 8601). Set by admin approval; absent means no trial
+  // was ever granted. While this is in the future the operator has full
+  // dashboard access with no card on file and no Stripe subscription, so
+  // subscriptionStatus stays "none" throughout. Admin-write only — the
+  // Firestore rules limit operator self-updates to username/email/businessName.
+  trialEndsAt?: string;
   createdAt?: unknown;
 }
 
@@ -196,4 +202,8 @@ export interface OperatorProfile {
   subscriptionExpiresAt?: string;
   applicationStatus?: "pending" | "approved" | "rejected";
   freeAccess?: boolean;
+  // Free-trial expiry (ISO 8601). See OperatorRecord.trialEndsAt. Read it
+  // through the helpers in lib/operator-access.ts, never by comparing dates
+  // inline — the access rule lives in one place on purpose.
+  trialEndsAt?: string;
 }

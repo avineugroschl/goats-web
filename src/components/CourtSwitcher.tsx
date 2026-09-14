@@ -24,8 +24,9 @@ interface PendingApp {
 interface CourtSwitcherProps {
   uid: string;
   operatorCourtIds: string[];
-  subscriptionQuantity: number;
-  freeAccess?: boolean;
+  // How many courts are unlocked. Computed by courtSeatLimit() in
+  // lib/operator-access.ts — Infinity for comped and trialing operators.
+  seatLimit: number;
   onActivateCourt: (court: Court) => void;
 }
 
@@ -36,8 +37,7 @@ interface CourtSwitcherProps {
 export function CourtSwitcher({
   uid,
   operatorCourtIds,
-  subscriptionQuantity,
-  freeAccess,
+  seatLimit,
   onActivateCourt,
 }: CourtSwitcherProps) {
   const selectedCourtId = useSelectedCourt();
@@ -126,7 +126,7 @@ export function CourtSwitcher({
     return [...courts].sort((a, b) => toMillis(a) - toMillis(b));
   }, [courts]);
 
-  const lockedThreshold = freeAccess ? Infinity : subscriptionQuantity;
+  const lockedThreshold = seatLimit;
 
   const selectedCourt = orderedCourts.find((c) => c.id === selectedCourtId) ?? orderedCourts[0];
 

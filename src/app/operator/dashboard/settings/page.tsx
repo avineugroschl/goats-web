@@ -15,6 +15,12 @@ import {
 } from "firebase/firestore";
 import { auth, db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import {
+  isTrialOnly,
+  trialDaysLeft,
+  courtSeatLimit,
+  formatAccessDate,
+} from "@/lib/operator-access";
 import { Court } from "@/lib/types";
 
 interface PendingApp {
@@ -37,6 +43,11 @@ export default function OperatorSettings() {
   const isSubscribed = profile?.subscriptionStatus === "active";
   const isCancelling = profile?.subscriptionStatus === "cancelling";
   const isFreeAccess = !!profile?.freeAccess;
+  // A trial is not a subscription — there's no Stripe customer behind it, so
+  // it gets its own branch everywhere rather than folding into hasAccess.
+  const isOnTrial = isTrialOnly(profile);
+  const trialDays = trialDaysLeft(profile);
+  const trialEndDate = formatAccessDate(profile?.trialEndsAt);
   const hasAccess = isSubscribed || isCancelling;
 
   // Show + auto-dismiss success toast after coming back from add-court.
@@ -51,6 +62,26 @@ export default function OperatorSettings() {
       return () => clearTimeout(timer);
     }
   }, [searchParams]);
+
+  // Trials have no Stripe customer yet, so converting one goes through
+  // checkout, not the billing portal.
+  async function handleSubscribe() {
+    setBillingLoading(true);
+    try {
+      const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
+      const result = await createCheckoutSession();
+      const url = (result.data as { url: string }).url;
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      alert("Failed to start checkout. Try again.");
+    } catch (err) {
+      console.error("Checkout error:", err);
+      alert("Failed to start checkout. Try again.");
+    }
+    setBillingLoading(false);
+  }
 
   async function handleManageBilling() {
     setBillingLoading(true);
@@ -90,8 +121,7 @@ export default function OperatorSettings() {
         <ManageCourtsSection
           uid={user.uid}
           operatorCourtIds={profile.operatorCourtIds}
-          subscriptionQuantity={profile.subscriptionQuantity ?? 1}
-          freeAccess={isFreeAccess}
+          seatLimit={courtSeatLimit(profile)}
         />
       )}
 
@@ -112,6 +142,7 @@ export default function OperatorSettings() {
                   ? new Date(profile.subscriptionExpiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
                   : "period ends"
               }` :
+              isOnTrial ? `Free trial \u00B7 ${trialDays === 1 ? "1 day left" : `${trialDays} days left`}` :
               profile?.subscriptionStatus === "past_due" ? "Past Due" :
               profile?.subscriptionStatus === "cancelled" ? "Cancelled" :
               "Not active"
@@ -119,6 +150,7 @@ export default function OperatorSettings() {
             valueColor={
               isSubscribed ? "text-status-confirmed" :
               isCancelling ? "text-status-pending" :
+              isOnTrial ? "text-teal" :
               profile?.subscriptionStatus === "past_due" ? "text-status-pending" :
               "text-white/40"
             }
@@ -132,7 +164,22 @@ export default function OperatorSettings() {
           Subscription
         </h3>
 
-        {hasAccess ? (
+        {isOnTrial ? (
+          <div className="space-y-4">
+            <p className="text-sm text-white/40">
+              {trialEndDate
+                ? `You're on a free trial with full access until ${trialEndDate}. There's no card on file. Subscribe to keep your dashboard after that.`
+                : "You're on a free trial with full access. There's no card on file. Subscribe to keep your dashboard when it ends."}
+            </p>
+            <button
+              onClick={handleSubscribe}
+              disabled={billingLoading}
+              className="rounded-xl bg-teal px-5 py-3 font-display text-xs font-bold uppercase tracking-wider text-surface-dark transition-all hover:bg-teal-dark disabled:opacity-50"
+            >
+              {billingLoading ? "Redirecting..." : "Subscribe — $25/mo"}
+            </button>
+          </div>
+        ) : hasAccess ? (
           <div className="space-y-4">
             <p className="text-sm text-white/40">
               {isCancelling
@@ -262,13 +309,12 @@ function SettingsRow({
 function ManageCourtsSection({
   uid,
   operatorCourtIds,
-  subscriptionQuantity,
-  freeAccess,
+  seatLimit,
 }: {
   uid: string;
   operatorCourtIds: string[];
-  subscriptionQuantity: number;
-  freeAccess: boolean;
+  // Unlocked court count from courtSeatLimit() — Infinity while comped or on trial.
+  seatLimit: number;
 }) {
   const [courts, setCourts] = useState<Court[]>([]);
   const [pending, setPending] = useState<PendingApp[]>([]);
@@ -347,7 +393,7 @@ function ManageCourtsSection({
     return toMillis(a) - toMillis(b);
   });
 
-  const activeThreshold = freeAccess ? Infinity : subscriptionQuantity;
+  const activeThreshold = seatLimit;
 
   return (
     <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
