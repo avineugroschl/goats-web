@@ -45,6 +45,14 @@ export interface Court {
   schedule?: Record<string, DaySchedule | null>;
   scheduleEnabled?: boolean;
   scheduleOverrides?: Record<string, ScheduleOverride>;
+  // DEAD as of 2026-09-14 — nothing reads this. It once gated the operator's
+  // own Send button on the dashboard, but never reached the apps: the "From the
+  // court" section of the notification sheet keys off isOperatorManaged
+  // (operatorIds non-empty), and onCourtNotificationCreated pushes to every
+  // active follower without consulting it. Still present on court docs, mostly
+  // as explicit `false` from the May 2026 cleanup, so do NOT revive it as a
+  // send gate — it would silently mute every existing court. A kill switch
+  // would need a new field where absent means allowed.
   notificationsEnabled?: boolean;
   promo?: CourtPromo | null;
   operatorBanner?: CourtBanner | null;
