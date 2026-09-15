@@ -65,6 +65,12 @@ export type ReviewCourt = {
   photoUrl?: string;
   photoUrlCard?: string;
   photoUrlFull?: string;
+  /** upload date of the sourced photo. NYC Parks strips EXIF, so this comes from the
+   *  image's Last-Modified header. Galleries run a decade deep and a stale photo is
+   *  the reason a court can look fine here and be flagged deteriorated by inspection. */
+  photoDate?: string;
+  photoSource?: string;
+  photoSourceUrl?: string;
   status: string;
   pipelineReview?: Review;
   reviewFeedback?: ReviewFeedback;
@@ -92,6 +98,74 @@ type Judge = {
   setNote: (f: string, note: string) => void;
 };
 
+
+/** How old is this photo, in plain words, and is that worth warning about? */
+function photoAge(date?: string): { label: string; stale: boolean } | null {
+  if (!date) return null;
+  const t = Date.parse(date);
+  if (Number.isNaN(t)) return null;
+  const years = (Date.now() - t) / (365.25 * 24 * 3600 * 1000);
+  const label = new Date(t).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return { label, stale: years >= 4 };
+}
+
+/**
+ * Full-size view of the card photo.
+ *
+ * Deliberately shows `photoUrlFull` rather than the 600x400 card crop — the crop is
+ * what the app shows, but for judging a court you want the whole frame. Overlay
+ * styling matches ActivateCourtModal so the dashboard has one modal look.
+ */
+function PhotoLightbox({ court, onClose }: { court: ReviewCourt; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const src = court.photoUrlFull || court.photoUrlCard || court.photoUrl || "";
+  const age = photoAge(court.photoDate);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+      <div className="max-h-full w-full max-w-3xl overflow-auto rounded-2xl border border-dash-border bg-dash-surface p-4"
+           onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold text-white">{court.name}</h4>
+            <p className="text-xs text-dash-text-muted">{court.address}</p>
+          </div>
+          <button onClick={onClose}
+                  className="shrink-0 rounded-lg border border-dash-border px-3 py-1 text-xs text-dash-text hover:bg-dash-bg">
+            Close
+          </button>
+        </div>
+
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={court.name} className="max-h-[70vh] w-full rounded-xl object-contain" />
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+          {age ? (
+            <span className={age.stale
+              ? "rounded bg-coral/20 px-2 py-0.5 font-semibold text-coral"
+              : "rounded bg-dash-bg px-2 py-0.5 text-dash-text-muted"}>
+              {age.stale ? `Taken ${age.label} — may be well out of date` : `Taken ${age.label}`}
+            </span>
+          ) : (
+            <span className="rounded bg-dash-bg px-2 py-0.5 text-dash-text-muted">Date unknown</span>
+          )}
+          {court.photoSource && (
+            court.photoSourceUrl
+              ? <a href={court.photoSourceUrl} target="_blank" rel="noreferrer" className="text-teal hover:underline">
+                  {court.photoSource} ↗
+                </a>
+              : <span className="text-dash-text-muted">{court.photoSource}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const BADGE: Record<string, string> = { GREEN: "🟢", YELLOW: "🟡", RED: "🔴" };
 function Conf({ c }: { c?: string }) {
@@ -260,6 +334,8 @@ export default function PendingCourtCard({
   };
 
   const photo = d.photoUrlCard || d.photoUrl || "";
+  const [lightbox, setLightbox] = useState(false);
+  const thumbAge = useMemo(() => photoAge(court.photoDate), [court.photoDate]);
 
   /**
    * Built from the pin as it stands, not from the link stored at discovery.
@@ -400,6 +476,11 @@ export default function PendingCourtCard({
         hoursOfOperation: d.hoursOfOperation, phoneNumber: d.phoneNumber,
         bookingUrl: (d.bookingUrl ?? "").trim(),
         goatsTake: d.goatsTake, photoUrlCard: d.photoUrlCard ?? "", photoUrlFull: d.photoUrlFull ?? "",
+        // carried so replacing a photo actually drops the old photo's provenance in
+        // Firestore too, rather than only in local state until the next refresh
+        photoDate: d.photoDate ?? null,
+        photoSource: d.photoSource ?? null,
+        photoSourceUrl: d.photoSourceUrl ?? null,
         // coordinates — editable so a slightly-off pin can be nudged before approval
         ...(Number.isFinite(Number(d.latitude)) ? { latitude: Number(d.latitude) } : {}),
         ...(Number.isFinite(Number(d.longitude)) ? { longitude: Number(d.longitude) } : {}),
@@ -417,16 +498,33 @@ export default function PendingCourtCard({
       const path = `court_photos_pending/${court.id}.${ext}`;
       await uploadBytes(ref(storage, path), file);
       const url = await getDownloadURL(ref(storage, path));
-      setD((p) => ({ ...p, photoUrlCard: url, photoUrlFull: url })); setDirty(true);
+      // A hand-uploaded photo is not the sourced one, so its provenance must go with
+      // it. Leaving photoDate behind would caption a photo taken today as 2016.
+      setD((p) => ({ ...p, photoUrlCard: url, photoUrlFull: url,
+                     photoDate: undefined, photoSource: undefined, photoSourceUrl: undefined }));
+      setDirty(true);
     } finally { setSaving(false); }
   }
 
   return (
     <div className="rounded-2xl border border-dash-border bg-dash-surface p-6">
+      {lightbox && photo && <PhotoLightbox court={{ ...court, ...d }} onClose={() => setLightbox(false)} />}
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-4">
           {photo
-            ? <img src={photo} alt="" className="h-14 w-14 rounded-lg object-cover" />
+            ? (
+              <button type="button" onClick={() => setLightbox(true)}
+                      title="Click to expand"
+                      className="group shrink-0 text-left">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo} alt="" className="h-14 w-14 rounded-lg object-cover transition group-hover:brightness-110" />
+                {thumbAge && (
+                  <span className={`mt-1 block text-center text-[9px] leading-none ${thumbAge.stale ? "text-coral" : "text-dash-text-muted"}`}>
+                    {thumbAge.label.replace(/^(\w+) (\d+), /, "")}
+                  </span>
+                )}
+              </button>
+            )
             : <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-dash-bg text-[10px] text-dash-text-muted">no photo</div>}
           <div>
             <h3 className="text-lg font-semibold text-white">{d.name || "Unnamed"}</h3>
