@@ -476,6 +476,9 @@ export default function PendingCourtCard({
         hoursOfOperation: d.hoursOfOperation, phoneNumber: d.phoneNumber,
         bookingUrl: (d.bookingUrl ?? "").trim(),
         goatsTake: d.goatsTake, photoUrlCard: d.photoUrlCard ?? "", photoUrlFull: d.photoUrlFull ?? "",
+        // photoUrl was not being saved. The app falls back to it when photoUrlCard is
+        // empty, so without this a removed photo stays visible on the live card.
+        photoUrl: d.photoUrl ?? "",
         // carried so replacing a photo actually drops the old photo's provenance in
         // Firestore too, rather than only in local state until the next refresh
         photoDate: d.photoDate ?? null,
@@ -633,6 +636,21 @@ export default function PendingCourtCard({
           {photo ? "Replace photo" : "Add photo"}
           <input type="file" accept="image/*" className="hidden" onChange={onPhoto} />
         </label>
+        {/* Removing without replacing was previously impossible: a bad or badly-stale
+            photo could only be swapped for another one. Clears the provenance with it
+            so a later photo cannot inherit the old one's date or source. */}
+        {photo && (
+          <button
+            onClick={() => {
+              setD((p) => ({ ...p, photoUrl: "", photoUrlCard: "", photoUrlFull: "",
+                             photoDate: undefined, photoSource: undefined, photoSourceUrl: undefined }));
+              setDirty(true);
+              dDirty.current = true;
+            }}
+            className="rounded-lg border border-coral/40 px-3 py-1.5 text-xs text-coral hover:bg-coral/10">
+            Remove photo
+          </button>
+        )}
         {rv && (
           <button onClick={() => setExpanded((s) => !s)} className="text-xs text-teal hover:underline">
             {expanded ? "Hide" : "Show"} AI research ({intelEntries.length} bots)
