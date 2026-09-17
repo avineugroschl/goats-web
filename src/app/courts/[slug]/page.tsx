@@ -7,7 +7,6 @@ import { courtPath } from "@/lib/slug";
 import GetAppCta from "@/components/GetAppCta";
 import CourtFeedbackButton from "@/components/CourtFeedbackButton";
 import {
-  getAllCourtsForStatic,
   getCourtBySlug,
   getCourtByLegacyId,
   getRegularsCount,
@@ -21,8 +20,11 @@ export const revalidate = 86400;
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  const courts = await getAllCourtsForStatic();
-  return courts.map((c) => ({ slug: c.slug || c.id }));
+  // Deliberately empty: dynamicParams + the 24h revalidate above mean every
+  // court page renders on first request and then stays cached, so build time
+  // no longer scales with the court count (388 today, 5,000+ planned). The
+  // cost is one ISR MISS per court per day, paid by that page's first visitor.
+  return [];
 }
 
 function heroImageOf(court: Court): string | undefined {

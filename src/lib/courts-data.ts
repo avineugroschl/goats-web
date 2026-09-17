@@ -153,8 +153,12 @@ export interface LocationGroup {
 // Group all geocoded courts by locationSlug. Courts without geo data are
 // omitted (they still have their own /courts/{slug} page). Groups sorted by
 // court count desc; courts within a group sorted by name.
-export async function getLocationGroups(): Promise<LocationGroup[]> {
-  const courts = await getAllCourtsForStatic();
+export async function getLocationGroups(
+  preloaded?: Court[]
+): Promise<LocationGroup[]> {
+  // The sitemap already holds the full list — accept it rather than reading
+  // the whole collection a second time in the same request.
+  const courts = preloaded ?? (await getAllCourtsForStatic());
   const map = new Map<string, LocationGroup>();
   for (const c of courts) {
     if (!c.locationSlug || !c.geoCity || !c.geoState) continue;

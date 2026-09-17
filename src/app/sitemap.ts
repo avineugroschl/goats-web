@@ -5,21 +5,24 @@ import { courtPath } from "@/lib/slug";
 const SITE = "https://www.goatssportsapp.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [courts, groups] = await Promise.all([
-    getAllCourtsForStatic(),
-    getLocationGroups(),
-  ]);
+  // One collection read: getLocationGroups used to call
+  // getAllCourtsForStatic() again internally, doubling the Firestore reads
+  // per sitemap render.
+  const courts = await getAllCourtsForStatic();
+  const groups = await getLocationGroups(courts);
 
+  // No lastModified on purpose: court docs carry no updatedAt field, and
+  // stamping every URL "changed now" on every regeneration teaches crawlers
+  // to ignore the signal — worse than omitting it. Revisit if updatedAt is
+  // ever added to court docs.
   const courtEntries: MetadataRoute.Sitemap = courts.map((court) => ({
     url: `${SITE}${courtPath(court)}`,
-    lastModified: new Date(),
     changeFrequency: "weekly",
     priority: 0.7,
   }));
 
   const hubEntries: MetadataRoute.Sitemap = groups.map((g) => ({
     url: `${SITE}/basketball-courts/${g.locationSlug}`,
-    lastModified: new Date(),
     changeFrequency: "weekly",
     priority: 0.8,
   }));
@@ -27,25 +30,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     {
       url: SITE,
-      lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 1,
     },
     {
       url: `${SITE}/basketball-courts`,
-      lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.9,
     },
     {
       url: `${SITE}/courts`,
-      lastModified: new Date(),
       changeFrequency: "daily",
       priority: 0.9,
     },
     {
       url: `${SITE}/operator`,
-      lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.8,
     },
