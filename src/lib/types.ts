@@ -55,6 +55,11 @@ export interface Court {
   // would need a new field where absent means allowed.
   notificationsEnabled?: boolean;
   promo?: CourtPromo | null;
+  // Server-owned yearly promo-day meter, written only by the
+  // expireOperatorContent cron (operators are rules-blocked from it).
+  // One day is counted per calendar day (court-local) the promo is active;
+  // at 100 days in a year the cron turns the promo off.
+  promoUsage?: PromoUsage | null;
   operatorBanner?: CourtBanner | null;
   // Publish gating: only set on operator-created courts. Missing/true = visible
   // in the apps; false = draft, hidden from app queries (filtered client-side).
@@ -93,6 +98,13 @@ export interface CourtPromo {
 export interface CourtBanner {
   text: string;
   updatedAt: unknown;
+  expiresAt?: unknown;
+}
+
+export interface PromoUsage {
+  year: number;
+  daysUsed: number;
+  lastCountedDate?: string; // YYYY-MM-DD, court-local
 }
 
 export interface OperatorApplication {

@@ -74,8 +74,11 @@ export default function CourtManagement() {
 
   // Banner / Promo
   const [bannerText, setBannerText] = useState("");
-  const [bannerExpiry, setBannerExpiry] = useState<string>("never"); // "never", "1h", "6h", "endOfDay", "24h", "custom"
+  const [bannerExpiry, setBannerExpiry] = useState<string>("90d"); // "1h", "6h", "endOfDay", "24h", "90d", "custom"
   const [bannerCustomExpiry, setBannerCustomExpiry] = useState("");
+  // When the loaded banner's expiresAt is already in the past (hidden in the
+  // apps but kept on the doc so it can be re-posted from here).
+  const [bannerExpiredAt, setBannerExpiredAt] = useState<Date | null>(null);
   const [promoText, setPromoText] = useState("");
   const [promoActive, setPromoActive] = useState(false);
 
@@ -166,15 +169,29 @@ export default function CourtManagement() {
           updateDoc(doc(db, "courts", cId), { scheduleOverrides: cleaned }).catch(() => {});
         }
 
-        const banner = data.operatorBanner as CourtBanner & { expiresAt?: { toDate?: () => Date } } | undefined;
+        const banner = data.operatorBanner as CourtBanner & {
+          expiresAt?: { toDate?: () => Date };
+          updatedAt?: { toDate?: () => Date };
+        } | undefined;
         setBannerText(banner?.text ?? "");
-        if (banner?.expiresAt?.toDate) {
+        const bannerExp = banner?.expiresAt?.toDate ? banner.expiresAt.toDate() : null;
+        const bannerUpd = banner?.updatedAt?.toDate ? banner.updatedAt.toDate() : null;
+        setBannerExpiredAt(bannerExp && bannerExp < new Date() ? bannerExp : null);
+        // A saved expiry within a few minutes of updatedAt + 90d is the
+        // "90 days" preset (updatedAt is a server timestamp, expiresAt is a
+        // client date, so they never match exactly).
+        const looksLike90d =
+          !!bannerExp && !!bannerUpd &&
+          Math.abs(bannerExp.getTime() - (bannerUpd.getTime() + 90 * 24 * 60 * 60 * 1000)) < 10 * 60 * 1000;
+        if (bannerExp && !looksLike90d) {
           setBannerExpiry("custom");
-          const d = banner.expiresAt.toDate();
+          const d = bannerExp;
           const localISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
           setBannerCustomExpiry(localISO);
         } else {
-          setBannerExpiry("never");
+          // Includes legacy banners saved with no expiry: the daily cron caps
+          // those at updatedAt + 90d, which is what this preset means.
+          setBannerExpiry("90d");
           setBannerCustomExpiry("");
         }
         setPromoText((data.promo as CourtPromo)?.text ?? "");
@@ -203,6 +220,31 @@ export default function CourtManagement() {
       phoneNumber: phoneNumber.trim(),
       bookingUrl: bookingEnabled ? bookingUrl.trim() : "",
     };
+  }
+
+  // Banner payload for save/publish. Null clears the banner. Every banner
+  // gets an expiresAt, capped at 90 days out — the server cron enforces the
+  // same ceiling on anything that slips past this.
+  function buildBannerData(): Record<string, unknown> | null {
+    if (!bannerText.trim()) return null;
+    const now = new Date();
+    const cap = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    let expiresAt: Date;
+    switch (bannerExpiry) {
+      case "1h": expiresAt = new Date(now.getTime() + 60 * 60 * 1000); break;
+      case "6h": expiresAt = new Date(now.getTime() + 6 * 60 * 60 * 1000); break;
+      case "endOfDay":
+        expiresAt = new Date(now);
+        expiresAt.setHours(23, 59, 59, 999);
+        break;
+      case "24h": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
+      case "custom":
+        expiresAt = bannerCustomExpiry ? new Date(bannerCustomExpiry) : new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        break;
+      default: expiresAt = cap; // "90d"
+    }
+    if (expiresAt > cap) expiresAt = cap;
+    return { text: bannerText.trim(), updatedAt: serverTimestamp(), expiresAt };
   }
 
   // Required-fields check for publish
@@ -238,34 +280,7 @@ export default function CourtManagement() {
         updates.scheduleEnabled = scheduleEnabled;
         updates.scheduleOverrides = scheduleOverrides;
       } else if (activeTab === "announcements") {
-        if (bannerText.trim()) {
-          const bannerData: Record<string, unknown> = {
-            text: bannerText.trim(),
-            updatedAt: serverTimestamp(),
-          };
-          // Calculate expiry timestamp
-          if (bannerExpiry !== "never") {
-            let expiresAt: Date;
-            const now = new Date();
-            switch (bannerExpiry) {
-              case "1h": expiresAt = new Date(now.getTime() + 60 * 60 * 1000); break;
-              case "6h": expiresAt = new Date(now.getTime() + 6 * 60 * 60 * 1000); break;
-              case "endOfDay":
-                expiresAt = new Date(now);
-                expiresAt.setHours(23, 59, 59, 999);
-                break;
-              case "24h": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
-              case "custom":
-                expiresAt = bannerCustomExpiry ? new Date(bannerCustomExpiry) : new Date(now.getTime() + 24 * 60 * 60 * 1000);
-                break;
-              default: expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-            }
-            bannerData.expiresAt = expiresAt;
-          }
-          updates.operatorBanner = bannerData;
-        } else {
-          updates.operatorBanner = null;
-        }
+        updates.operatorBanner = buildBannerData();
       } else if (activeTab === "promo") {
         updates.promo = {
           active: promoActive,
@@ -275,6 +290,7 @@ export default function CourtManagement() {
       }
 
       await updateDoc(doc(db, "courts", courtId), updates);
+      if (activeTab === "announcements") setBannerExpiredAt(null);
       setSavedAt(Date.now());
       setTimeout(() => setSavedAt(null), 2500);
     } catch (err) {
@@ -297,25 +313,7 @@ export default function CourtManagement() {
     try {
       // Save ALL form values across all tabs + flip published to true.
       // This ensures unsaved changes on any tab are included.
-      const bannerData: Record<string, unknown> | null = bannerText.trim()
-        ? (() => {
-            const bd: Record<string, unknown> = { text: bannerText.trim(), updatedAt: serverTimestamp() };
-            if (bannerExpiry !== "never") {
-              const now = new Date();
-              let expiresAt: Date;
-              switch (bannerExpiry) {
-                case "1h": expiresAt = new Date(now.getTime() + 60 * 60 * 1000); break;
-                case "6h": expiresAt = new Date(now.getTime() + 6 * 60 * 60 * 1000); break;
-                case "endOfDay": expiresAt = new Date(now); expiresAt.setHours(23, 59, 59, 999); break;
-                case "24h": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
-                case "custom": expiresAt = bannerCustomExpiry ? new Date(bannerCustomExpiry) : new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
-                default: expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-              }
-              bd.expiresAt = expiresAt;
-            }
-            return bd;
-          })()
-        : null;
+      const bannerData = buildBannerData();
 
       await updateDoc(doc(db, "courts", courtId), {
         ...buildCourtUpdates(),
@@ -440,6 +438,15 @@ export default function CourtManagement() {
     { id: "announcements", label: "Announcements" },
     { id: "promo", label: "Promo" },
   ];
+
+  // Yearly promo-day meter, maintained server-side in court.promoUsage
+  // (one day counted per calendar day the promo is active, 100/year cap).
+  const promoYear = new Date().getFullYear();
+  const promoDaysUsed =
+    court?.promoUsage && court.promoUsage.year === promoYear
+      ? court.promoUsage.daysUsed
+      : 0;
+  const promoMaxed = promoDaysUsed >= 100;
 
   const isPublished = court.published !== false;
   const missingForPublish = requiredFieldsMissing();
@@ -950,8 +957,21 @@ export default function CourtManagement() {
               <p className="text-sm text-white/40">
                 Optional. This message shows at the top of your court&apos;s page in the app.
                 Use it for status updates, temporary notices, or daily messages.
+                Announcements are hidden in the app automatically 90 days after your
+                last edit. Editing and saving restarts the clock.
               </p>
             </div>
+
+            {bannerExpiredAt && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+                <p className="text-sm font-semibold text-amber-400">
+                  Expired {bannerExpiredAt.toLocaleDateString()}
+                </p>
+                <p className="mt-0.5 text-xs text-white/40">
+                  This announcement is hidden in the app. Save it again to re-post it.
+                </p>
+              </div>
+            )}
 
             <textarea
               value={bannerText}
@@ -970,11 +990,11 @@ export default function CourtManagement() {
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {[
-                      { id: "never", label: "Never" },
                       { id: "1h", label: "1 hour" },
                       { id: "6h", label: "6 hours" },
                       { id: "endOfDay", label: "End of day" },
                       { id: "24h", label: "24 hours" },
+                      { id: "90d", label: "90 days" },
                       { id: "custom", label: "Custom" },
                     ].map((opt) => (
                       <button
@@ -995,12 +1015,13 @@ export default function CourtManagement() {
                       type="datetime-local"
                       value={bannerCustomExpiry}
                       onChange={(e) => setBannerCustomExpiry(e.target.value)}
+                      max={new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
                       className="mt-2 rounded-lg border border-dash-border bg-dash-bg px-3 py-2 text-sm text-white outline-none focus:border-teal"
                     />
                   )}
                 </div>
 
-                <div className="rounded-xl border border-teal/20 bg-teal/5 p-4">
+                <div className={`rounded-xl border border-teal/20 bg-teal/5 p-4 ${bannerExpiredAt ? "opacity-50" : ""}`}>
                   <p className="text-xs font-medium uppercase tracking-wider text-teal/60">Preview</p>
                   <p className="mt-2 text-sm text-white">{bannerText}</p>
                 </div>
@@ -1021,12 +1042,35 @@ export default function CourtManagement() {
               <p className="text-sm text-white/40">
                 Optional. When active, your court card gets a highlighted border in the
                 app&apos;s court list and your promo text is shown.
+                Promos turn off automatically 60 days after your last edit.
               </p>
             </div>
 
+            <div className="rounded-xl border border-dash-border bg-dash-bg p-4">
+              <p className="text-xs text-white/60">
+                {promoDaysUsed} of 100 promo days used in {promoYear}
+              </p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-dash-border">
+                <div
+                  className={`h-full rounded-full ${promoMaxed ? "bg-coral" : "bg-teal"}`}
+                  style={{ width: `${Math.min(100, promoDaysUsed)}%` }}
+                />
+              </div>
+              {promoMaxed && (
+                <p className="mt-2 text-xs text-coral">
+                  You&apos;ve used all 100 promo days for {promoYear}. Promos will be
+                  available again on Jan 1.
+                </p>
+              )}
+            </div>
+
             <button
-              onClick={() => setPromoActive(!promoActive)}
-              className="flex items-center gap-4"
+              onClick={() => {
+                if (!promoActive && promoMaxed) return;
+                setPromoActive(!promoActive);
+              }}
+              disabled={!promoActive && promoMaxed}
+              className={`flex items-center gap-4 ${!promoActive && promoMaxed ? "cursor-not-allowed opacity-40" : ""}`}
             >
               <div className={`relative h-7 w-12 rounded-full transition-colors ${
                 promoActive ? "bg-teal" : "bg-dash-border"
