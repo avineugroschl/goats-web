@@ -75,13 +75,11 @@ function linkify(text: string): ReactNode[] {
   return nodes;
 }
 
+// Deliberately never uses goatsTake: the description feeds the meta tag,
+// Open Graph, Twitter card, and JSON-LD, all of which end up verbatim in
+// search snippets and AI answers — the Take is our editorial IP and stays
+// on-page only (and even there, under data-nosnippet).
 function metaDescription(court: Court): string {
-  const take = (court.goatsTake || "").trim();
-  if (take) {
-    return take.length > 155
-      ? take.slice(0, 152).replace(/\s+\S*$/, "") + "…"
-      : take;
-  }
   const where = court.address ? ` at ${court.address}` : "";
   return `${court.name} — pickup basketball court${where}. Baskets, hours, condition, 3-point line and who's playing, on G.O.A.T.S.`.slice(
     0,
@@ -314,7 +312,7 @@ export default async function CourtDetailsPage({
 
       {/* Goats Take */}
       {court.goatsTake && (
-        <section className="mb-4 rounded-2xl bg-surface p-6 shadow-sm">
+        <section data-nosnippet className="mb-4 rounded-2xl bg-surface p-6 shadow-sm">
           <h2 className="mb-3 text-xl font-bold">
             <span className="text-teal">G.O.A.T.S</span> Take
           </h2>
