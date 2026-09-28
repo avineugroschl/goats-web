@@ -11,25 +11,19 @@ import { getAppCourts } from "@/lib/courts-data";
 // of traffic.
 export const revalidate = 60;
 
-// Exactly the fields the /courts directory page renders — nothing more. The
-// full court docs (takes, hours, operator fields, ...) used to be dumped here
-// wholesale, which quietly undercut the auth-gated Firestore rules: anyone
-// with curl got the entire dataset. What remains is no more than what the
-// public court pages already show.
+// The web shows name, address and coordinates only; everything else about a
+// court (photos, takes, details) is app-only by design. `claimed` lets the
+// operator claim pickers grey out taken courts without shipping operatorIds.
+// Also feeds those pickers, so the browser never reads `courts` directly.
 function toDirectoryCourt(c: Record<string, unknown>) {
   return {
     id: c.id,
     slug: c.slug,
     name: c.name,
-    address: c.address,
-    setting: c.setting,
-    accessType: c.accessType,
-    baskets: c.baskets,
-    courtCondition: c.courtCondition,
+    address: c.address ?? "",
     latitude: c.latitude,
     longitude: c.longitude,
-    photoUrl: c.photoUrl,
-    photoUrlCard: c.photoUrlCard,
+    claimed: Array.isArray(c.operatorIds) && c.operatorIds.length > 0,
   };
 }
 

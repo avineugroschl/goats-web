@@ -10,7 +10,7 @@ export const revalidate = 86400;
 export const metadata: Metadata = {
   title: { absolute: "Basketball Courts by City | G.O.A.T.S" },
   description:
-    "Browse pickup basketball courts by city and borough — conditions, hours, hoops, and who's playing. Find a court near you on G.O.A.T.S.",
+    "Browse pickup basketball courts by city and borough. Find a court near you and get the full court info in the G.O.A.T.S app.",
   alternates: { canonical: `${SITE}/basketball-courts` },
   openGraph: {
     title: "Basketball Courts by City",
@@ -67,8 +67,8 @@ export default async function BasketballCourtsIndex() {
 
       <h1 className="mb-2 text-3xl font-bold">Basketball Courts by City</h1>
       <p className="mb-8 text-text-secondary">
-        Find pickup basketball courts near you. Browse by city and borough for
-        court conditions, hours, hoops, and real-time activity.
+        Find pickup basketball courts near you. Browse by city and borough,
+        then get the full court info in the G.O.A.T.S app.
       </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

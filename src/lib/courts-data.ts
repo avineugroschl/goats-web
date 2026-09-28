@@ -25,6 +25,14 @@ function toCourt(id: string, data: Record<string, unknown>): Court {
   return { id, ...data } as Court;
 }
 
+// Same visibility rule the apps use: unpublished operator drafts and
+// admin-only courts (the testSeed courts, adminTestCourt) never reach the
+// public site. Every read below goes through it, so the /courts directory,
+// court pages, hubs and sitemap can't disagree.
+export function isPublicCourt(c: { published?: boolean; adminOnly?: boolean }): boolean {
+  return c.published !== false && c.adminOnly !== true;
+}
+
 // Fetch every doc in a collection. Returns [] on error (missing collection,
 // rules denial during the fallback path, etc.).
 async function fetchCollection(source: Source): Promise<Court[]> {
@@ -32,14 +40,14 @@ async function fetchCollection(source: Source): Promise<Court[]> {
   if (admin) {
     try {
       const snap = await admin.collection(source).get();
-      return snap.docs.map((d) => toCourt(d.id, d.data()));
+      return snap.docs.map((d) => toCourt(d.id, d.data())).filter(isPublicCourt);
     } catch {
       return [];
     }
   }
   try {
     const snap = await getDocs(collection(db, source));
-    return snap.docs.map((d) => toCourt(d.id, d.data()));
+    return snap.docs.map((d) => toCourt(d.id, d.data())).filter(isPublicCourt);
   } catch {
     return [];
   }
@@ -56,7 +64,8 @@ async function fetchBySlug(source: Source, slug: string): Promise<Court | null> 
         .get();
       if (!snap.empty) {
         const d = snap.docs[0];
-        return toCourt(d.id, d.data());
+        const court = toCourt(d.id, d.data());
+        return isPublicCourt(court) ? court : null;
       }
     } catch {
       // fall through
@@ -69,7 +78,8 @@ async function fetchBySlug(source: Source, slug: string): Promise<Court | null> 
     );
     if (!snap.empty) {
       const d = snap.docs[0];
-      return toCourt(d.id, d.data());
+      const court = toCourt(d.id, d.data());
+      return isPublicCourt(court) ? court : null;
     }
   } catch {
     // ignore missing collection
@@ -82,7 +92,10 @@ async function fetchById(source: Source, id: string): Promise<Court | null> {
   if (admin) {
     try {
       const snap = await admin.collection(source).doc(id).get();
-      if (snap.exists) return toCourt(snap.id, snap.data() ?? {});
+      if (snap.exists) {
+        const court = toCourt(snap.id, snap.data() ?? {});
+        return isPublicCourt(court) ? court : null;
+      }
     } catch {
       // fall through
     }
@@ -90,7 +103,10 @@ async function fetchById(source: Source, id: string): Promise<Court | null> {
   }
   try {
     const snap = await getDoc(doc(db, source, id));
-    if (snap.exists()) return toCourt(snap.id, snap.data());
+    if (snap.exists()) {
+      const court = toCourt(snap.id, snap.data());
+      return isPublicCourt(court) ? court : null;
+    }
   } catch {
     // ignore missing collection
   }

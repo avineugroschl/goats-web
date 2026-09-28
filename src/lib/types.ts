@@ -65,6 +65,8 @@ export interface Court {
   // in the apps; false = draft, hidden from app queries (filtered client-side).
   // Admin-created courts and user-submitted approved courts never set this.
   published?: boolean;
+  // Admin-only test/staging courts (always paired with published: false).
+  adminOnly?: boolean;
   // Stamped by admin approval. Used to order operatorCourtIds deterministically
   // so the activation lock (first N courts where N = subscriptionQuantity) is
   // stable across reloads. Missing on legacy/admin-created courts — those sort first.
@@ -226,4 +228,16 @@ export interface OperatorProfile {
   // through the helpers in lib/operator-access.ts, never by comparing dates
   // inline — the access rule lives in one place on purpose.
   trialEndsAt?: string;
+}
+
+// A row of the /api/courts feed: the only court data the public site and the
+// operator claim pickers receive.
+export interface PickerCourt {
+  id: string;
+  slug?: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  claimed: boolean;
 }

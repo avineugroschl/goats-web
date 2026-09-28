@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 const MAX_MESSAGE = 2000;
 const MAX_EMAIL = 200;
 
-// A gentle "Edits, thoughts, or comments?" prompt on each court page. Opens a
+// A gentle "Tell us about the court" prompt on each court page. Opens a
 // lightweight overlay where anyone (no sign-in) can leave a note about the
 // court plus an optional email. Writes to the `court_feedback` collection,
 // keyed by court, for review in the admin dashboard.
@@ -88,7 +88,7 @@ export default function CourtFeedbackButton({
         onClick={() => setOpen(true)}
         className="mb-4 w-full rounded-2xl border border-teal/20 bg-surface p-4 text-center text-sm font-medium text-teal shadow-sm transition-colors hover:bg-teal-light"
       >
-        Edits, thoughts, or comments?
+        Tell us about the court
       </button>
 
       {/* Overlay */}
@@ -134,7 +134,7 @@ export default function CourtFeedbackButton({
             ) : (
               <form onSubmit={handleSubmit}>
                 <h2 className="mb-1 text-xl font-bold text-text-primary">
-                  Edits, thoughts, or comments?
+                  Tell us about the court
                 </h2>
                 <p className="mb-4 text-sm text-text-secondary">
                   Tell us anything about {courtName}: a correction, an idea, or

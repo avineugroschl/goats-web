@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import { permanentRedirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Court } from "@/lib/types";
 import { courtPath } from "@/lib/slug";
 import GetAppCta from "@/components/GetAppCta";
 import CourtFeedbackButton from "@/components/CourtFeedbackButton";
-import {
-  getCourtBySlug,
-  getCourtByLegacyId,
-  getRegularsCount,
-} from "@/lib/courts-data";
+import { getCourtBySlug, getCourtByLegacyId } from "@/lib/courts-data";
 
 const SITE = "https://www.goatssportsapp.com";
 
@@ -27,61 +22,13 @@ export async function generateStaticParams() {
   return [];
 }
 
-function heroImageOf(court: Court): string | undefined {
-  return court.photoUrlFull || court.photoUrlCard || court.photoUrl || undefined;
-}
-
-// Decorative avatar tints for the regulars stack (the faces are generic, the
-// count is real).
-const AVATAR_TINTS = [
-  "bg-teal text-text-on-dark",
-  "bg-coral text-text-on-dark",
-  "bg-teal-light text-teal-dark",
-  "bg-teal-dark text-text-on-dark",
-  "bg-coral-dark text-text-on-dark",
-];
-
-// Turn bare URLs / www links inside a GOATS take into clickable anchors,
-// leaving the surrounding text untouched. Trailing sentence punctuation is
-// peeled off the link so "(see nycgovparks.org)." doesn't swallow the ")." .
-function linkify(text: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  const re = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
-    }
-    let url = match[0];
-    const trailing = url.match(/[.,;:!?)\]]+$/)?.[0] ?? "";
-    if (trailing) url = url.slice(0, url.length - trailing.length);
-    const href = url.startsWith("http") ? url : `https://${url}`;
-    nodes.push(
-      <a
-        key={match.index}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-teal underline underline-offset-2 hover:text-teal-dark"
-      >
-        {url}
-      </a>
-    );
-    if (trailing) nodes.push(trailing);
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
-  return nodes;
-}
-
-// Deliberately never uses goatsTake: the description feeds the meta tag,
-// Open Graph, Twitter card, and JSON-LD, all of which end up verbatim in
-// search snippets and AI answers — the Take is our editorial IP and stays
-// on-page only (and even there, under data-nosnippet).
+// Court pages carry name, address and coordinates only: photos, the Take and
+// every other court detail are app-only by design (data protection). The
+// description feeds the meta tag, Open Graph, Twitter card and JSON-LD, so it
+// must not promise or leak anything beyond that.
 function metaDescription(court: Court): string {
   const where = court.address ? ` at ${court.address}` : "";
-  return `${court.name} — pickup basketball court${where}. Baskets, hours, condition, 3-point line and who's playing, on G.O.A.T.S.`.slice(
+  return `${court.name}, pickup basketball court${where}. Get the full court info in the G.O.A.T.S app.`.slice(
     0,
     160
   );
@@ -111,7 +58,6 @@ export async function generateMetadata({
 
   const canonical = `${SITE}${courtPath(court)}`;
   const description = metaDescription(court);
-  const image = heroImageOf(court);
   const area = court.geoCity ? ` in ${court.geoCity}` : "";
   const ogTitle = `${court.name} — Basketball Court${area}`;
 
@@ -124,13 +70,11 @@ export async function generateMetadata({
       description,
       url: canonical,
       type: "website",
-      images: image ? [image] : undefined,
     },
     twitter: {
-      card: "summary_large_image",
+      card: "summary",
       title: ogTitle,
       description,
-      images: image ? [image] : undefined,
     },
   };
 }
@@ -138,7 +82,6 @@ export async function generateMetadata({
 function buildJsonLd(court: Court) {
   const canonical = `${SITE}${courtPath(court)}`;
   const hasGeo = court.latitude !== 0 && court.longitude !== 0;
-  const image = heroImageOf(court);
 
   const place: Record<string, unknown> = {
     "@type": "SportsActivityLocation",
@@ -148,7 +91,6 @@ function buildJsonLd(court: Court) {
     description: metaDescription(court),
     sport: "Basketball",
   };
-  if (image) place.image = image;
   if (court.address) {
     place.address = {
       "@type": "PostalAddress",
@@ -165,7 +107,6 @@ function buildJsonLd(court: Court) {
       longitude: court.longitude,
     };
   }
-  if (court.phoneNumber) place.telephone = court.phoneNumber;
 
   // Add a breadcrumb (Basketball Courts › City › Court) when the court is
   // geocoded, tying the page into its hub.
@@ -208,9 +149,6 @@ export default async function CourtDetailsPage({
   const court = await resolveCourt(slug);
   if (!court) notFound();
 
-  const heroImage = heroImageOf(court);
-  const regularsCount = await getRegularsCount(court.id);
-
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-4 py-8">
       {/* Structured data for search engines */}
@@ -246,19 +184,6 @@ export default async function CourtDetailsPage({
         </nav>
       )}
 
-      {/* Hero Image */}
-      {heroImage && (
-        <div className="mb-6 overflow-hidden rounded-2xl shadow-lg">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={heroImage}
-            alt={court.name}
-            className="w-full object-cover"
-            style={{ aspectRatio: "3 / 2" }}
-          />
-        </div>
-      )}
-
       {/* Court Name & Address */}
       <div className="mb-6">
         <h1 className="mb-2 text-3xl font-bold">{court.name}</h1>
@@ -278,101 +203,15 @@ export default async function CourtDetailsPage({
         </div>
       </div>
 
-      {/* Regulars social proof — real favoriter count, decorative avatars */}
-      {regularsCount > 0 && (
-        <section className="mb-8 rounded-2xl bg-surface p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex flex-shrink-0 -space-x-3">
-              {Array.from({ length: Math.min(regularsCount, 5) }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-surface ${AVATAR_TINTS[i % AVATAR_TINTS.length]}`}
-                  style={{ zIndex: 5 - i }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z" /></svg>
-                </div>
-              ))}
-            </div>
-            <div className="min-w-0">
-              <p className="font-semibold">
-                {regularsCount} player{regularsCount !== 1 ? "s" : ""} call
-                {regularsCount === 1 ? "s" : ""} this their court
-              </p>
-              <p className="text-sm text-text-secondary">
-                Favorite this court in the app to get notified when there&apos;s
-                action.
-              </p>
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Get the app CTA */}
       <GetAppCta className="mb-8" />
 
-      {/* Goats Take */}
-      {court.goatsTake && (
-        <section data-nosnippet className="mb-4 rounded-2xl bg-surface p-6 shadow-sm">
-          <h2 className="mb-3 text-xl font-bold">
-            <span className="text-teal">G.O.A.T.S</span> Take
-          </h2>
-          <p className="leading-relaxed text-text-secondary">
-            {linkify(court.goatsTake)}
-          </p>
-        </section>
-      )}
-
-      {/* Edits, thoughts, or comments? */}
+      {/* Tell us about the court */}
       <CourtFeedbackButton
         courtId={court.id}
         courtName={court.name}
         courtSlug={court.slug || court.id}
       />
-
-      {/* Court Info */}
-      <section className="mb-8 rounded-2xl bg-surface p-6 shadow-sm">
-        <h2 className="mb-4 text-xl font-bold">Court Details</h2>
-        <div className="grid grid-cols-2 gap-y-5 gap-x-8">
-          <InfoRow label="Baskets" value={String(court.baskets)} />
-          <InfoRow label="Setting" value={court.setting} />
-          <InfoRow label="Access" value={court.accessType} />
-          <InfoRow label="Condition" value={court.courtCondition} />
-          <InfoRow label="3-Point Line" value={court.threePointLine} />
-          <InfoRow label="Lights" value={court.hasLights ? "Yes" : "No"} />
-          {court.hoursOfOperation && (
-            <InfoRow label="Hours" value={court.hoursOfOperation} />
-          )}
-          {court.phoneNumber && (
-            <InfoRow label="Phone" value={court.phoneNumber} />
-          )}
-          {court.bookingUrl && (
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
-                Booking
-              </p>
-              <a
-                href={/^https?:\/\//.test(court.bookingUrl) ? court.bookingUrl : `https://${court.bookingUrl}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-0.5 inline-block font-semibold text-teal hover:underline"
-              >
-                Book court ↗
-              </a>
-            </div>
-          )}
-        </div>
-      </section>
     </main>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
-        {label}
-      </p>
-      <p className="mt-0.5 font-semibold">{value}</p>
-    </div>
   );
 }

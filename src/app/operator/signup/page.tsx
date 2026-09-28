@@ -18,7 +18,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { Court } from "@/lib/types";
+import { Court, PickerCourt } from "@/lib/types";
 import { uploadCourtMainPhoto } from "@/lib/processImage";
 import {
   isValidEmailSyntax,
@@ -117,7 +117,7 @@ export default function OperatorSignup() {
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<{ cardUrl: string; fullUrl: string } | null>(null);
 
   // Claim existing court
-  const [courts, setCourts] = useState<Court[]>([]);
+  const [courts, setCourts] = useState<PickerCourt[]>([]);
   const [selectedCourtId, setSelectedCourtId] = useState("");
   const [courtSearch, setCourtSearch] = useState("");
   const [verificationInfo, setVerificationInfo] = useState("");
@@ -133,8 +133,11 @@ export default function OperatorSignup() {
   async function loadCourts() {
     setLoadingCourts(true);
     try {
-      const snap = await getDocs(collection(db, "courts"));
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Court));
+      // Server feed (public courts only: name, address, claimed flag); the
+      // browser never reads full court docs.
+      const res = await fetch("/api/courts");
+      if (!res.ok) throw new Error(`courts fetch failed: ${res.status}`);
+      const list = (await res.json()) as PickerCourt[];
       list.sort((a, b) => a.name.localeCompare(b.name));
       setCourts(list);
     } finally {
@@ -827,7 +830,7 @@ export default function OperatorSignup() {
                       <p className="py-8 text-center text-sm text-white/30">No courts found</p>
                     ) : (
                       filteredCourts.map((court) => {
-                        const hasClaimed = (court.operatorIds?.length ?? 0) > 0;
+                        const hasClaimed = court.claimed;
                         return (
                           <button
                             key={court.id}
