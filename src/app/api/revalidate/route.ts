@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { COURTS_CACHE_TAG } from "@/lib/courts-data";
 
 // On-demand ISR revalidation endpoint.
 //
@@ -44,6 +45,10 @@ export async function POST(req: NextRequest) {
     body.locationSlug || req.nextUrl.searchParams.get("locationSlug") || undefined;
 
   const revalidated: string[] = [];
+
+  // Drop the cached collection-wide read (sitemap / hubs / /api/courts), so
+  // the regenerated pages below see the edit instead of a 6h-old list.
+  revalidateTag(COURTS_CACHE_TAG);
 
   if (slug) {
     const path = `/courts/${slug}`;

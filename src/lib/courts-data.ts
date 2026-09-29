@@ -8,9 +8,49 @@ import {
   limit,
   getCountFromServer,
 } from "firebase/firestore";
+import { unstable_cache } from "next/cache";
 import { db } from "./firebase";
 import { getAdminDb } from "./firebase-admin";
 import { Court } from "./types";
+
+// ---------------------------------------------------------------------------
+// COST NOTE (2026-09-28). Every collection-wide read below costs one Firestore
+// read PER COURT DOC, and it used to run on EVERY render of the sitemap, the
+// /basketball-courts index, every city hub and /api/courts — i.e. on every
+// crawler hit once a page went stale. Measured: ~250 full reads/day at 388
+// courts (~100k reads/day), and with 5,388 courts in the collection that
+// became 780k reads in ONE HOUR after a bulk write marked the pages stale.
+// Two fixes here:
+//   1. `fetchCollection` is wrapped in `unstable_cache` (Vercel Data Cache),
+//      tagged so /api/revalidate can drop it on a real edit, and re-read at
+//      most every 6h otherwise. It also SELECTs only the handful of fields the
+//      collection-wide callers use, so the cached entry stays well under
+//      Vercel's 2MB per-entry cap (a full court doc with its take and photo
+//      URLs would not at scale).
+//   2. City hubs query `where locationSlug ==` instead of scanning everything.
+// The per-court page (`getCourtBySlug`) was already a single-doc query.
+// ---------------------------------------------------------------------------
+
+export const COURTS_CACHE_TAG = "courts";
+const COURTS_CACHE_SECONDS = 6 * 60 * 60;
+
+// The only fields the collection-wide readers (sitemap, hubs, /api/courts)
+// need. Keep in sync with `toDirectoryCourt` in /api/courts and the hub
+// grouping below. No Timestamps: the cache serialises to JSON.
+const SLIM_FIELDS = [
+  "slug",
+  "name",
+  "address",
+  "latitude",
+  "longitude",
+  "locationSlug",
+  "geoCity",
+  "geoState",
+  "geoStateName",
+  "published",
+  "adminOnly",
+  "operatorIds",
+] as const;
 
 // Server-side court reads for static generation + sitemap + the /api/courts
 // route. Prefers the Admin SDK (FIREBASE_SERVICE_ACCOUNT env var — bypasses
@@ -33,13 +73,16 @@ export function isPublicCourt(c: { published?: boolean; adminOnly?: boolean }): 
   return c.published !== false && c.adminOnly !== true;
 }
 
-// Fetch every doc in a collection. Returns [] on error (missing collection,
-// rules denial during the fallback path, etc.).
-async function fetchCollection(source: Source): Promise<Court[]> {
+// Fetch every doc in a collection (slim projection — see COST NOTE). Returns
+// [] on error (missing collection, rules denial during the fallback path).
+async function fetchCollectionUncached(source: Source): Promise<Court[]> {
   const admin = await getAdminDb();
   if (admin) {
     try {
-      const snap = await admin.collection(source).get();
+      const snap = await admin
+        .collection(source)
+        .select(...SLIM_FIELDS)
+        .get();
       return snap.docs.map((d) => toCourt(d.id, d.data())).filter(isPublicCourt);
     } catch {
       return [];
@@ -47,10 +90,59 @@ async function fetchCollection(source: Source): Promise<Court[]> {
   }
   try {
     const snap = await getDocs(collection(db, source));
-    return snap.docs.map((d) => toCourt(d.id, d.data())).filter(isPublicCourt);
+    return snap.docs
+      .map((d) => {
+        const data = d.data();
+        const slim: Record<string, unknown> = {};
+        for (const f of SLIM_FIELDS) if (f in data) slim[f] = data[f];
+        return toCourt(d.id, slim);
+      })
+      .filter(isPublicCourt);
   } catch {
     return [];
   }
+}
+
+// Cached for COURTS_CACHE_SECONDS across every render and every Vercel
+// function instance; /api/revalidate drops it by tag on a real court edit.
+const fetchCollectionCached = unstable_cache(
+  async (source: Source) => fetchCollectionUncached(source),
+  ["courts-collection-slim-v1"],
+  { revalidate: COURTS_CACHE_SECONDS, tags: [COURTS_CACHE_TAG] }
+);
+
+async function fetchCollection(source: Source): Promise<Court[]> {
+  return fetchCollectionCached(source);
+}
+
+// One city/borough's courts by a single equality query — a hub render costs
+// that hub's courts, not the whole directory. Falls back to the cached full
+// list only when the Admin SDK isn't configured.
+async function fetchByLocationSlug(locationSlug: string): Promise<Court[] | null> {
+  const admin = await getAdminDb();
+  if (!admin) return null;
+  const results: Court[] = [];
+  const seen = new Set<string>();
+  for (const source of SOURCES) {
+    try {
+      const snap = await admin
+        .collection(source)
+        .where("locationSlug", "==", locationSlug)
+        .select(...SLIM_FIELDS)
+        .get();
+      for (const d of snap.docs) {
+        const court = toCourt(d.id, d.data());
+        if (!isPublicCourt(court)) continue;
+        const key = court.slug || court.id;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push(court);
+      }
+    } catch {
+      // missing collection etc. — keep going
+    }
+  }
+  return results;
 }
 
 async function fetchBySlug(source: Source, slug: string): Promise<Court | null> {
@@ -202,6 +294,11 @@ export async function getLocationGroups(
 export async function getLocationBySlug(
   locationSlug: string
 ): Promise<LocationGroup | null> {
+  const direct = await fetchByLocationSlug(locationSlug);
+  if (direct !== null) {
+    const groups = await getLocationGroups(direct);
+    return groups.find((g) => g.locationSlug === locationSlug) || null;
+  }
   const groups = await getLocationGroups();
   return groups.find((g) => g.locationSlug === locationSlug) || null;
 }
