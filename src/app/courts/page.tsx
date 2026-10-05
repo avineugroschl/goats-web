@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, useMemo, useRef } from "react";
+import { stateNameFor } from "@/lib/us-states";
 import { Court } from "@/lib/types";
 import { courtPath } from "@/lib/slug";
 import Link from "next/link";
@@ -213,10 +214,13 @@ export default function CourtsPage() {
 
     if (search) {
       const q = search.toLowerCase();
+      // Name, address and the full state name (from the address tail), so
+      // "texas" / "new jersey" match like "tx" / "nj" do. 2026-10-05.
       result = result.filter(
         (c) =>
           c.name.toLowerCase().includes(q) ||
-          c.address.toLowerCase().includes(q)
+          c.address.toLowerCase().includes(q) ||
+          stateNameFor(c.address).toLowerCase().includes(q)
       );
     }
 
