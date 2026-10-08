@@ -149,7 +149,7 @@ export default function TermsOfService() {
           <Section title="9. Golden G.O.A.T. Subscription">
             <p className="mb-3">
               Golden G.O.A.T. is an auto-renewable subscription that unlocks premium features within the G.O.A.T.S
-              mobile application, including expanded saved courts, access to rating history, access to court busyness
+              mobile application, including expanded saved courts, sending blasts to nearby court chats, access to rating history, access to court busyness
               history charts, a golden border on your profile avatar, and additional weight on your ratings of other
               players.
             </p>
