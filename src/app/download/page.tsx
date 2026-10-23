@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { APP_CONFIG, getDeviceType, buildStoreUrl } from '@/lib/app-config';
+import { trackStoreClick } from '@/lib/analytics';
 
 export default function DownloadRedirect() {
   const [showAndroidMessage, setShowAndroidMessage] = useState(false);
@@ -16,14 +17,18 @@ export default function DownloadRedirect() {
     const hasUtm = Object.keys(utmParams).length > 0;
 
     if (device === 'ios') {
-      window.location.href = hasUtm
+      const url = hasUtm
         ? buildStoreUrl(APP_CONFIG.appStoreUrl, utmParams)
         : APP_CONFIG.appStoreUrl;
+      trackStoreClick('app_store', 'download_redirect', url);
+      window.location.href = url;
     } else if (device === 'android') {
       if (APP_CONFIG.playStoreAvailable && APP_CONFIG.playStoreUrl) {
-        window.location.href = hasUtm
+        const url = hasUtm
           ? buildStoreUrl(APP_CONFIG.playStoreUrl, utmParams)
           : APP_CONFIG.playStoreUrl;
+        trackStoreClick('play_store', 'download_redirect', url);
+        window.location.href = url;
       } else {
         setShowAndroidMessage(true);
       }

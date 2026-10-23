@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { APP_CONFIG, getDeviceType, buildStoreUrl } from "@/lib/app-config";
+import { trackStoreClick } from "@/lib/analytics";
 
 // The "Get the G.O.A.T.S App" card that appears on the courts list, court
 // details, and location hub pages. On desktop it pops the download QR (same
@@ -21,12 +22,15 @@ export default function GetAppCta({ className }: { className?: string }) {
 
   function handleClick() {
     if (getDeviceType() === "desktop") {
+      trackStoreClick("smart_link", "qr_modal");
       setShowQr(true);
     } else {
-      window.location.href = buildStoreUrl(APP_CONFIG.smartLinkUrl, {
+      const url = buildStoreUrl(APP_CONFIG.smartLinkUrl, {
         utm_source: "website",
         utm_medium: "cta",
       });
+      trackStoreClick("smart_link", "get_app_cta", url);
+      window.location.href = url;
     }
   }
 

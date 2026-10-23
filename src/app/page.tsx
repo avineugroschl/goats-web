@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Footer from "@/components/Footer";
 import { APP_CONFIG, getDeviceType, buildStoreUrl } from "@/lib/app-config";
+import { trackStoreClick } from "@/lib/analytics";
 
 /* ── Modern phone frame with realistic bezel + dynamic island ── */
 function PhoneFrame({
@@ -61,12 +62,15 @@ export default function Home() {
 
   function handleAppStoreBadge() {
     if (getDeviceType() === "desktop") {
+      trackStoreClick("app_store", "qr_modal");
       setShowQrModal(true);
     } else {
-      window.location.href = buildStoreUrl(APP_CONFIG.appStoreUrl, {
+      const url = buildStoreUrl(APP_CONFIG.appStoreUrl, {
         utm_source: "website",
         utm_medium: "badge",
       });
+      trackStoreClick("app_store", "home_badge", url);
+      window.location.href = url;
     }
   }
 
@@ -76,12 +80,15 @@ export default function Home() {
       return;
     }
     if (getDeviceType() === "desktop") {
+      trackStoreClick("play_store", "qr_modal");
       setShowQrModal(true);
     } else if (APP_CONFIG.playStoreUrl) {
-      window.location.href = buildStoreUrl(APP_CONFIG.playStoreUrl, {
+      const url = buildStoreUrl(APP_CONFIG.playStoreUrl, {
         utm_source: "website",
         utm_medium: "badge",
       });
+      trackStoreClick("play_store", "home_badge", url);
+      window.location.href = url;
     }
   }
 

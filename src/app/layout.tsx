@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { APP_CONFIG } from "@/lib/app-config";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.goatssportsapp.com"),
@@ -120,6 +121,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-bg antialiased">
         <AuthProvider>{children}</AuthProvider>
+        {/* GA4 web stream for property goat-db. Loads after hydration;
+            pageviews + route changes come from enhanced measurement. */}
+        <GoogleAnalytics gaId="G-2DV6X1DCW0" />
       </body>
     </html>
   );

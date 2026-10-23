@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { APP_CONFIG, getDeviceType, buildStoreUrl } from '@/lib/app-config';
+import { trackStoreClick } from '@/lib/analytics';
 
 const FIRESTORE_BASE =
   'https://firestore.googleapis.com/v1/projects/goat-db/databases/(default)/documents';
@@ -88,6 +89,13 @@ export default function AmbassadorRedirect() {
       // Network/CSP/blocker errors don't matter — user already redirected.
     }
 
+    if (device === 'ios' || device === 'android') {
+      trackStoreClick(
+        device === 'ios' ? 'app_store' : 'play_store',
+        'referral_redirect',
+        destination,
+      );
+    }
     window.location.href = destination;
   }, [params]);
 
